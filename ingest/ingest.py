@@ -122,9 +122,9 @@ class LandRegistryIngestor:
             logger.error("Failed to connect to database", error=str(e), config=self.db_config)
             raise DatabaseError(f"Database connection failed: {e}")
     
-    async def stream_csv_data(self, conn: psycopg.AsyncConnection, url: str, batch_size: int = 1000):
+    async def stream_csv_data(self, conn: psycopg.AsyncConnection, url: str, batch_size: int = 1000, bulk_mode: bool = False):
         """Stream CSV data directly from HTTP response and process in chunks."""
-        logger.info("Starting streaming download and processing", url=url, batch_size=batch_size)
+        logger.info("Starting streaming download and processing", url=url, batch_size=batch_size, bulk_mode=bulk_mode)
         
         try:
             async with httpx.AsyncClient(timeout=300.0) as client:
@@ -133,10 +133,10 @@ class LandRegistryIngestor:
                     
                     content_length = response.headers.get('content-length')
                     total_mb = round(int(content_length) / 1024 / 1024, 2) if content_length else None
-                    logger.info("Starting stream processing", url=url, size_mb=total_mb)
+                    logger.info("Starting stream processing", url=url, size_mb=total_mb, mode="COPY bulk" if bulk_mode else "upsert delta")
                     
                     # Initialize streaming CSV processor
-                    await self._process_streaming_csv(conn, response, batch_size, total_mb)
+                    await self._process_streaming_csv(conn, response, batch_size, total_mb, bulk_mode)
                     
         except httpx.RequestError as e:
             logger.error("Download failed", url=url, error=str(e))
@@ -145,7 +145,7 @@ class LandRegistryIngestor:
             logger.error("HTTP error during download", url=url, status=e.response.status_code)
             raise DownloadError(f"HTTP {e.response.status_code} for {url}")
     
-    async def _process_streaming_csv(self, conn: psycopg.AsyncConnection, response, batch_size: int, total_mb: Optional[float]):
+    async def _process_streaming_csv(self, conn: psycopg.AsyncConnection, response, batch_size: int, total_mb: Optional[float], bulk_mode: bool = False):
         """Process CSV data as it streams from HTTP response."""
         buffer = ""
         batch = []
@@ -187,7 +187,10 @@ class LandRegistryIngestor:
                         
                         # Process batch when it reaches batch_size
                         if len(batch) >= batch_size:
-                            await self.process_batch(conn, batch)
+                            if bulk_mode:
+                                await self.process_batch_bulk(conn, batch)
+                            else:
+                                await self.process_batch(conn, batch)
                             batch = []
                             
                             # Update progress bar
@@ -216,7 +219,10 @@ class LandRegistryIngestor:
             
             # Process final batch
             if batch:
-                await self.process_batch(conn, batch)
+                if bulk_mode:
+                    await self.process_batch_bulk(conn, batch)
+                else:
+                    await self.process_batch(conn, batch)
         
         logger.info("Streaming processing complete", 
                    bytes_processed=bytes_processed,
@@ -341,8 +347,51 @@ class LandRegistryIngestor:
     
 
     
+    async def process_batch_bulk(self, conn: psycopg.AsyncConnection, batch: List[Dict]):
+        """Process batch using PostgreSQL COPY for maximum performance (bulk loads only)."""
+        if not batch:
+            return
+            
+        try:
+            async with conn.cursor() as cursor:
+                # Use psycopg3's copy context manager for efficient bulk insert
+                async with cursor.copy("COPY transactions (transaction_id, price, date, postcode, property_type, new_build, tenure, paon, saon, street, locality, town, district, county, ppd_type, record_status) FROM STDIN") as copy:
+                    for transaction in batch:
+                        # Prepare row data in correct order
+                        row_data = (
+                            transaction['transaction_id'],
+                            transaction['price'], 
+                            transaction['date'],
+                            transaction['postcode'],
+                            transaction['property_type'],
+                            transaction['new_build'],
+                            transaction['tenure'],
+                            transaction['paon'],
+                            transaction['saon'],
+                            transaction['street'],
+                            transaction['locality'],
+                            transaction['town'],
+                            transaction['district'],
+                            transaction['county'],
+                            transaction['ppd_type'],
+                            transaction['record_status']
+                        )
+                        
+                        await copy.write_row(row_data)
+                
+            self.session_stats['inserted_rows'] += len(batch)
+            logger.debug("Bulk inserted batch", count=len(batch))
+            
+        except Exception as e:
+            logger.error("Failed to bulk insert batch", 
+                        batch_size=len(batch),
+                        error=str(e))
+            # Fallback to individual processing if COPY fails
+            logger.info("Falling back to individual upserts for failed batch")
+            await self.process_batch(conn, batch)
+    
     async def process_batch(self, conn: psycopg.AsyncConnection, batch: List[Dict]):
-        """Process a batch of transactions."""
+        """Process a batch of transactions with individual upserts (for monthly deltas with A/C/D handling)."""
         for transaction in batch:
             try:
                 await self.upsert_transaction(conn, transaction)
@@ -367,12 +416,12 @@ class LandRegistryIngestor:
             return dict(result) if result else {}
     
     async def ingest_full_dataset(self):
-        """Ingest the complete historical dataset."""
-        logger.info("Starting full dataset ingestion")
+        """Ingest the complete historical dataset using bulk COPY for maximum performance."""
+        logger.info("Starting full dataset ingestion with bulk COPY")
         
         conn = await self.get_database_connection()
         try:
-            await self.stream_csv_data(conn, LAND_REGISTRY_URLS['full'])
+            await self.stream_csv_data(conn, LAND_REGISTRY_URLS['full'], batch_size=5000, bulk_mode=True)
             await self.refresh_materialized_views(conn)
             
             freshness = await self.get_data_freshness(conn)
@@ -382,14 +431,14 @@ class LandRegistryIngestor:
             await conn.close()
     
     async def ingest_yearly_data(self, year: int):
-        """Ingest data for a specific year."""
-        logger.info("Starting yearly data ingestion", year=year)
+        """Ingest data for a specific year using bulk COPY for maximum performance."""
+        logger.info("Starting yearly data ingestion with bulk COPY", year=year)
         
         url = LAND_REGISTRY_URLS['yearly'].format(year=year)
         conn = await self.get_database_connection()
         
         try:
-            await self.stream_csv_data(conn, url)
+            await self.stream_csv_data(conn, url, batch_size=5000, bulk_mode=True)
             await self.refresh_materialized_views(conn)
             
             freshness = await self.get_data_freshness(conn)
@@ -399,12 +448,13 @@ class LandRegistryIngestor:
             await conn.close()
     
     async def ingest_monthly_updates(self):
-        """Ingest monthly delta updates."""
-        logger.info("Starting monthly updates ingestion")
+        """Ingest monthly delta updates using individual upserts for A/C/D record handling."""
+        logger.info("Starting monthly updates ingestion with individual upserts for A/C/D handling")
         
         conn = await self.get_database_connection()
         try:
-            await self.stream_csv_data(conn, LAND_REGISTRY_URLS['monthly'], batch_size=500)  # Smaller batches for updates
+            # Use smaller batches and individual upserts for monthly deltas
+            await self.stream_csv_data(conn, LAND_REGISTRY_URLS['monthly'], batch_size=500, bulk_mode=False)
             await self.refresh_materialized_views(conn)
             
             freshness = await self.get_data_freshness(conn)
