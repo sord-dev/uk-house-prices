@@ -13,12 +13,10 @@ Usage:
 """
 
 import asyncio
-import csv
 import logging
 import os
 import sys
 from datetime import datetime, date
-from io import StringIO
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -31,6 +29,8 @@ from psycopg import sql
 from psycopg.rows import dict_row
 from tqdm import tqdm
 from dotenv import load_dotenv
+
+from parsing import parse_csv_line, parse_transaction_row, should_include_transaction, ParseResult
 
 # Load environment variables
 load_dotenv()
@@ -74,12 +74,6 @@ DB_CONFIG = {
     'password': os.getenv('POSTGRES_PASSWORD'),
 }
 
-# Target counties for filtering
-TARGET_COUNTIES = [
-    county.strip().upper() 
-    for county in os.getenv('TARGET_COUNTIES', 'ESSEX,HERTFORDSHIRE,KENT,SURREY,CAMBRIDGESHIRE').split(',')
-]
-
 class IngestionError(Exception):
     """Base exception for ingestion errors."""
     pass
@@ -101,7 +95,6 @@ class LandRegistryIngestor:
     
     def __init__(self):
         self.db_config = DB_CONFIG
-        self.target_counties = TARGET_COUNTIES
         self.session_stats = {
             'downloaded_rows': 0,
             'processed_rows': 0,
@@ -173,13 +166,19 @@ class LandRegistryIngestor:
                     # Parse CSV row
                     try:
                         # Handle quoted fields in CSV
-                        row = self._parse_csv_line(line)
-                        transaction = self.parse_transaction_row(row)
+                        row = parse_csv_line(line)
+                        result, transaction, error_msg = parse_transaction_row(row)
                         
-                        if not transaction:
+                        if result != ParseResult.SUCCESS:
+                            if error_msg:
+                                logger.warning("Failed to parse CSV line", error=error_msg, line=line[:100])
+                            self.session_stats['error_rows'] += 1
                             continue
                             
-                        if not self.should_include_transaction(transaction):
+                        # Transaction is guaranteed to be valid here
+                        assert transaction is not None, "Transaction should not be None when parsing succeeds"
+                        if not should_include_transaction(transaction):
+                            self.session_stats['filtered_rows'] += 1
                             continue
                             
                         batch.append(transaction)
@@ -209,13 +208,24 @@ class LandRegistryIngestor:
             # Process any remaining lines in buffer
             if buffer.strip():
                 try:
-                    row = self._parse_csv_line(buffer.strip())
-                    transaction = self.parse_transaction_row(row)
-                    if transaction and self.should_include_transaction(transaction):
-                        batch.append(transaction)
-                        self.session_stats['processed_rows'] += 1
+                    row = parse_csv_line(buffer.strip())
+                    result, transaction, error_msg = parse_transaction_row(row)
+                    
+                    if result == ParseResult.SUCCESS:
+                        assert transaction is not None, "Transaction should not be None when parsing succeeds"
+                        if should_include_transaction(transaction):
+                            batch.append(transaction)
+                            self.session_stats['processed_rows'] += 1
+                        else:
+                            self.session_stats['filtered_rows'] += 1
+                    else:
+                        if error_msg:
+                            logger.warning("Failed to process final buffer", error=error_msg)
+                        self.session_stats['error_rows'] += 1
+                        
                 except Exception as e:
                     logger.warning("Failed to process final buffer", error=str(e))
+                    self.session_stats['error_rows'] += 1
             
             # Process final batch
             if batch:
@@ -228,74 +238,6 @@ class LandRegistryIngestor:
                    bytes_processed=bytes_processed,
                    mb_processed=round(bytes_processed / 1024 / 1024, 2),
                    stats=self.session_stats)
-    
-    def _parse_csv_line(self, line: str) -> List[str]:
-        """Parse a single CSV line, handling quoted fields."""
-        # Use Python's CSV parser for proper handling
-        csv_reader = csv.reader([line])
-        try:
-            return next(csv_reader)
-        except StopIteration:
-            return []
-    
-    def parse_transaction_row(self, row: List[str]) -> Optional[Dict]:
-        """Parse a single transaction row from CSV."""
-        if len(row) != 16:
-            self.session_stats['error_rows'] += 1
-            return None
-            
-        try:
-            # Parse date
-            date_str = row[2].strip()
-            if date_str:
-                transaction_date = datetime.strptime(date_str, '%Y-%m-%d %H:%M').date()
-            else:
-                transaction_date = None
-                
-            # Parse price
-            try:
-                price = int(row[1]) if row[1].strip() else 0
-            except ValueError:
-                price = 0
-            
-            transaction = {
-                'transaction_id': row[0].strip(),
-                'price': price,
-                'date': transaction_date,
-                'postcode': row[3].strip().upper() if row[3] else None,
-                'property_type': row[4].strip().upper() if row[4] else None,
-                'new_build': row[5].strip().upper() if row[5] else None,
-                'tenure': row[6].strip().upper() if row[6] else None,
-                'paon': row[7].strip() if row[7] else None,
-                'saon': row[8].strip() if row[8] else None,
-                'street': row[9].strip() if row[9] else None,
-                'locality': row[10].strip() if row[10] else None,
-                'town': row[11].strip() if row[11] else None,
-                'district': row[12].strip() if row[12] else None,
-                'county': row[13].strip().upper() if row[13] else None,
-                'ppd_type': row[14].strip().upper() if row[14] else None,
-                'record_status': row[15].strip().upper() if row[15] else 'A'
-            }
-            
-            return transaction
-            
-        except Exception as e:
-            logger.warning("Failed to parse transaction row", error=str(e), row=row[:3])
-            self.session_stats['error_rows'] += 1
-            return None
-    
-    def should_include_transaction(self, transaction: Dict) -> bool:
-        """Check if transaction should be included based on target counties."""
-        county = transaction.get('county')
-        if not county:
-            return False
-            
-        # Include if county matches target counties
-        if county in self.target_counties:
-            return True
-            
-        self.session_stats['filtered_rows'] += 1
-        return False
     
     async def upsert_transaction(self, conn: psycopg.AsyncConnection, transaction: Dict):
         """Insert or update a transaction record."""
@@ -430,19 +372,45 @@ class LandRegistryIngestor:
         finally:
             await conn.close()
     
-    async def ingest_yearly_data(self, year: int):
-        """Ingest data for a specific year using bulk COPY for maximum performance."""
-        logger.info("Starting yearly data ingestion with bulk COPY", year=year)
-        
-        url = LAND_REGISTRY_URLS['yearly'].format(year=year)
+    async def check_year_has_data(self, conn: psycopg.AsyncConnection, year: int) -> bool:
+        """Check if database already contains data for the specified year."""
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                "SELECT COUNT(*) FROM transactions WHERE EXTRACT(YEAR FROM date) = %s LIMIT 1",
+                (year,)
+            )
+            result = await cursor.fetchone()
+            return result[0] > 0 if result else False
+    
+    async def ingest_yearly_data(self, year: int, force_bulk: bool = False):
+        """Ingest data for a specific year, intelligently choosing bulk vs upsert mode."""
         conn = await self.get_database_connection()
         
         try:
-            await self.stream_csv_data(conn, url, batch_size=5000, bulk_mode=True)
+            # Check if data already exists for this year
+            has_existing_data = await self.check_year_has_data(conn, year)
+            
+            if has_existing_data and not force_bulk:
+                logger.info("Found existing data for year, using upsert mode to avoid COPY conflicts", year=year)
+                bulk_mode = False
+                batch_size = 1000
+                mode_desc = "upsert mode (existing data detected)"
+            else:
+                if force_bulk and has_existing_data:
+                    logger.warning("Force bulk mode enabled despite existing data - COPY may fail on conflicts", year=year)
+                logger.info("Using bulk COPY mode for maximum performance", year=year)
+                bulk_mode = True
+                batch_size = 5000
+                mode_desc = "bulk COPY mode"
+                
+            logger.info("Starting yearly data ingestion", year=year, mode=mode_desc)
+            
+            url = LAND_REGISTRY_URLS['yearly'].format(year=year)
+            await self.stream_csv_data(conn, url, batch_size=batch_size, bulk_mode=bulk_mode)
             await self.refresh_materialized_views(conn)
             
             freshness = await self.get_data_freshness(conn)
-            logger.info("Yearly ingestion complete", year=year, stats=self.session_stats, freshness=freshness)
+            logger.info("Yearly ingestion complete", year=year, mode=mode_desc, stats=self.session_stats, freshness=freshness)
             
         finally:
             await conn.close()
@@ -471,11 +439,14 @@ class LandRegistryIngestor:
 @click.option('--year', 
               type=int, 
               help='Year for yearly mode (e.g., 2023)')
+@click.option('--force-bulk', 
+              is_flag=True,
+              help='Force bulk COPY mode for yearly ingests even if data exists (may fail on conflicts)')
 @click.option('--log-level', 
               type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']),
               default='INFO',
               help='Logging level')
-def main(mode: str, year: Optional[int], log_level: str):
+def main(mode: str, year: Optional[int], force_bulk: bool, log_level: str):
     """UK House Prices Data Ingestion Service."""
     
     # Configure logging
@@ -485,7 +456,7 @@ def main(mode: str, year: Optional[int], log_level: str):
     logger.info("Starting ingestion service", 
                 mode=mode, 
                 year=year,
-                target_counties=TARGET_COUNTIES,
+                target_counties=os.getenv('TARGET_COUNTIES', 'ESSEX,HERTFORDSHIRE,KENT,SURREY,CAMBRIDGESHIRE').split(','),
                 db_host=DB_CONFIG['host'])
     
     ingestor = LandRegistryIngestor()
@@ -497,7 +468,7 @@ def main(mode: str, year: Optional[int], log_level: str):
             if not year:
                 click.echo("Error: --year is required for yearly mode", err=True)
                 sys.exit(1)
-            asyncio.run(ingestor.ingest_yearly_data(year))
+            asyncio.run(ingestor.ingest_yearly_data(year, force_bulk=force_bulk))
         elif mode == 'monthly':
             asyncio.run(ingestor.ingest_monthly_updates())
         elif mode == 'postcode-lookup':
