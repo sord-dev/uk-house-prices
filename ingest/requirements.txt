@@ -1,0 +1,23 @@
+# HTTP client for downloading CSV files
+httpx==0.27.0
+
+# PostgreSQL adapter (latest version with async support)
+psycopg[binary]==3.1.18
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# Argument parsing
+click==8.1.7
+
+# Progress bars for long-running operations
+tqdm==4.66.2
+
+# Logging and utilities
+structlog==24.1.0
+
+# Date/time utilities
+python-dateutil==2.9.0
+
+# Data validation
+pydantic==2.6.4
