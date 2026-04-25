@@ -6,7 +6,7 @@ After=docker.service
 [Service]
 Type=oneshot
 User=picxi
-WorkingDirectory=/home/picxi/Desktop/projects/picxibox/uk-house-prices
+WorkingDirectory=/mnt/ssd/picxibox/uk-house-prices
 ExecStart=/usr/bin/docker-compose run --rm ingest python ingest.py --mode monthly
 StandardOutput=journal
 StandardError=journal
