@@ -88,9 +88,8 @@ def parse_transaction_row(row: List[str]) -> Tuple[ParseResult, Optional[Dict], 
 
 def should_include_transaction(transaction: Dict, target_counties: Optional[List[str]] = None) -> bool:
     """Check if transaction should be included based on target counties."""
-    if target_counties is None:
-        target_counties = TARGET_COUNTIES
-        
+    if not target_counties:
+        return True # No filter, process everything if .env is empty
     county = transaction.get('county')
     if not county:
         return False
