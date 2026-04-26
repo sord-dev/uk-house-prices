@@ -6,10 +6,10 @@ from pyproj import Transformer
 transformer = Transformer.from_crs("EPSG:27700", "EPSG:4326")
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5432,
-    'dbname': 'house_prices',
-    'user': 'prices',
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', 5432)),
+    'dbname': os.getenv('POSTGRES_DB', 'house_prices'),
+    'user': os.getenv('POSTGRES_USER', 'prices'),
     'password': os.getenv('POSTGRES_PASSWORD'),
 }
 
