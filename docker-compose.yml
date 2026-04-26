@@ -46,6 +46,9 @@ services:
     build:
       context: ./ingest
       dockerfile: Dockerfile
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     container_name: house_prices_ingest
     environment:
       POSTGRES_HOST: postgres
