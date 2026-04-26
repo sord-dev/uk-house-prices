@@ -63,6 +63,27 @@ services:
     profiles:
       - ingest
 
+  postcode-ingest:
+      build:
+        context: ./ingest
+        dockerfile: Dockerfile
+      container_name: house_prices_postcode_ingest
+      environment:
+        POSTGRES_HOST: postgres
+        POSTGRES_DB: ${POSTGRES_DB:-house_prices}
+        POSTGRES_USER: ${POSTGRES_USER:-prices}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      volumes:
+        - ./postcode_csv:/app/postcode_csv:ro
+        - ./ingest:/app
+      networks:
+        - house_prices_net
+      depends_on:
+        postgres:
+          condition: service_healthy
+      profiles:
+        - postcode
+
 networks:
   house_prices_net:
     driver: bridge
