@@ -2,6 +2,10 @@
 
 A self-hosted data pipeline that ingests HM Land Registry Price Paid Data into PostgreSQL and visualizes it through Grafana dashboards. Built for tracking residential property prices in target areas with automated monthly updates.
 
+<img width="1597" height="952" alt="image" src="https://github.com/user-attachments/assets/c49e9b05-7daf-46f4-a1e5-901172046d1e" />
+
+<img width="1598" height="955" alt="image" src="https://github.com/user-attachments/assets/0d8a10c6-9654-4187-baa2-93630a7ae3be" />
+
 ## Architecture
 
 ```
