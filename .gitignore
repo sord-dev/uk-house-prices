@@ -59,3 +59,4 @@ grafana/csv/
 grafana/pdf/
 grafana/unified-search/
 backup_*.sql.gz
+backup_*.sql.gz
