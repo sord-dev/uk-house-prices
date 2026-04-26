@@ -50,3 +50,11 @@ Thumbs.db
 
 # Backups
 backup_*.sql.gz
+
+# Grafana
+grafana/grafana.db
+grafana/plugins/
+grafana/png/
+grafana/csv/
+grafana/pdf/
+grafana/unified-search/
