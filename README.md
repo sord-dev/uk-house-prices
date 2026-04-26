@@ -35,7 +35,9 @@ HM Land Registry API → Python Ingest Service → PostgreSQL 16 → Grafana Das
 
 ```bash
 # Clone/create project directory
-cd /home/picxi/Desktop/projects/picxibox/uk-house-prices
+cd {whatever-dir-you-want}
+
+clone https://github.com/sord-dev/uk-house-prices.git
 
 # Copy environment template
 cp .env.example .env
@@ -163,54 +165,6 @@ Expected storage requirements (PostgreSQL + indexes):
 | England & Wales, full history | ~28M | ~15GB |
 
 Mount point in docker-compose.yml should use fast storage (NVMe/SSD).
-
-## Automation
-
-### Cron Setup
-
-Create monthly update cron job:
-
-```bash
-# Edit crontab
-crontab -e
-
-# Add entry to run on 21st of each month at 6 AM
-0 6 21 * * cd /home/picxi/Desktop/projects/picxibox/uk-house-prices && docker-compose run --rm ingest python ingest.py --mode monthly
-```
-
-### Systemd Timer (Alternative)
-
-```bash
-# Copy timer files
-sudo cp scripts/house-prices-update.* /etc/systemd/system/
-
-# Enable and start
-sudo systemctl enable house-prices-update.timer
-sudo systemctl start house-prices-update.timer
-
-# Check status
-sudo systemctl list-timers house-prices*
-```
-
-## Dashboard Ideas
-
-### 1. Price Trends Dashboard
-- Median price over time by county (line chart)
-- Property type breakdown (stacked area)
-- New build vs existing (comparison)
-- Filter controls: date range, property type, tenure
-
-### 2. Geographic Dashboard  
-- Postcode district heatmap (median prices)
-- Transaction volume choropleth
-- County-level aggregations
-- Interactive drill-down capabilities
-
-### 3. Market Analysis Dashboard
-- Transaction volume trends (bar chart)
-- Price distribution histograms
-- Seasonal patterns analysis
-- Market activity indicators
 
 ## Database Schema
 
