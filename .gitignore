@@ -47,3 +47,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+
+# Backups
+backup_*.sql.gz
