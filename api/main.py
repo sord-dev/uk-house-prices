@@ -109,14 +109,14 @@ async def get_monthly_summary_data() -> List[Dict]:
             county,
             COUNT(*) as transactions,
             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
-            ROUND(100.0 * (
+            ROUND((100.0 * (
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
                 - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
                     AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
             ) / NULLIF(
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
                     AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-            , 0), 1) as mom_change_pct
+            , 0))::NUMERIC, 1) as mom_change_pct
         FROM transactions
         WHERE ppd_type = 'A'
           AND record_status = 'A'
