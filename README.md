@@ -63,7 +63,7 @@ TARGET_COUNTIES=ESSEX,HERTFORDSHIRE,KENT,SURREY,CAMBRIDGESHIRE
 
 # AI service configuration (optional)
 OLLAMA_HOST=http://192.168.10.11:11434
-OLLAMA_MODEL=qwen2.5:1.5b
+OLLAMA_MODEL=llama3.2:3b
 ```
 
 ### 4. Start Services
@@ -130,17 +130,33 @@ curl http://localhost:8001/api/health
 
 ### AI Market Summaries
 
-Generate plain English briefings suitable for push notifications:
+Generate plain English briefings suitable for push notifications, alongside structured data:
 
 ```bash
-# Get AI-powered market summary
 curl -X POST http://localhost:8001/api/summarise/monthly
+```
 
-# Example response:
+Response shape:
+
+```json
 {
-  "summary": "Essex led with 1,247 transactions at a £425,000 median (+2.1% month-over-month). Kent followed with 1,156 sales at £380,000 (+1.8% MoM). Hertfordshire showed 987 transactions at £520,000 (+0.9% MoM). Surrey recorded 856 sales at £615,000 (+1.2% MoM). Market activity increased across all monitored counties."
+  "summary": "Our March 2026 market update reports 1,766 transactions across 8 monitored areas, with Kent leading at 571 transactions. The top areas by volume are Kent (£330,000), Essex (£375,000), and Hertfordshire (£450,000). Bexley saw the largest year-on-year gain at +15.7% YoY.",
+  "data_period": "April 2026",
+  "actual_date_range": { "from": "2026-03-01", "to": "2026-03-31" },
+  "areas_analysed": 8,
+  "data": {
+    "top_by_volume": [...],
+    "top_gainers": [...],
+    "top_fallers": [...],
+    "top_yoy_gainers": [...],
+    "top_yoy_fallers": [...]
+  }
 }
 ```
+
+**`data_period`** is the nominal reporting month (e.g. "April 2026"). **`actual_date_range`** shows the real transaction dates in the data — due to Land Registry registration lag, these will typically be 4–8 weeks behind the nominal period. Responses are cached per reporting month and invalidated automatically on ingest.
+
+The `data` block contains pre-selected notable areas (top by transaction volume, biggest MoM and YoY movers) for use in dashboards or notifications without re-querying. Pull `.summary` for the push notification text.
 
 ### Automation
 

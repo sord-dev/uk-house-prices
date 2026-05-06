@@ -16,7 +16,8 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime, date
+import calendar
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -175,8 +176,9 @@ class LandRegistryIngestor:
                             self.session_stats['error_rows'] += 1
                             continue
                             
-                        # Transaction is guaranteed to be valid here
-                        assert transaction is not None, "Transaction should not be None when parsing succeeds"
+                        if transaction is None:
+                            self.session_stats['error_rows'] += 1
+                            continue
                         if not should_include_transaction(transaction):
                             self.session_stats['filtered_rows'] += 1
                             continue
@@ -186,10 +188,7 @@ class LandRegistryIngestor:
                         
                         # Process batch when it reaches batch_size
                         if len(batch) >= batch_size:
-                            if bulk_mode:
-                                await self.process_batch_bulk(conn, batch)
-                            else:
-                                await self.process_batch(conn, batch)
+                            await self._dispatch_batch(conn, batch, bulk_mode)
                             batch = []
                             
                             # Update progress bar
@@ -212,8 +211,9 @@ class LandRegistryIngestor:
                     result, transaction, error_msg = parse_transaction_row(row)
                     
                     if result == ParseResult.SUCCESS:
-                        assert transaction is not None, "Transaction should not be None when parsing succeeds"
-                        if should_include_transaction(transaction):
+                        if transaction is None:
+                            self.session_stats['error_rows'] += 1
+                        elif should_include_transaction(transaction):
                             batch.append(transaction)
                             self.session_stats['processed_rows'] += 1
                         else:
@@ -229,10 +229,7 @@ class LandRegistryIngestor:
             
             # Process final batch
             if batch:
-                if bulk_mode:
-                    await self.process_batch_bulk(conn, batch)
-                else:
-                    await self.process_batch(conn, batch)
+                await self._dispatch_batch(conn, batch, bulk_mode)
         
         logger.info("Streaming processing complete", 
                    bytes_processed=bytes_processed,
@@ -338,10 +335,16 @@ class LandRegistryIngestor:
             try:
                 await self.upsert_transaction(conn, transaction)
             except Exception as e:
-                logger.error("Failed to upsert transaction", 
+                logger.error("Failed to upsert transaction",
                            transaction_id=transaction.get('transaction_id'),
                            error=str(e))
                 self.session_stats['error_rows'] += 1
+
+    async def _dispatch_batch(self, conn: psycopg.AsyncConnection, batch: List[Dict], bulk_mode: bool):
+        if bulk_mode:
+            await self.process_batch_bulk(conn, batch)
+        else:
+            await self.process_batch(conn, batch)
     
     async def refresh_materialized_views(self, conn: psycopg.AsyncConnection):
         """Refresh materialized views after data ingestion."""
@@ -418,22 +421,68 @@ class LandRegistryIngestor:
     async def ingest_monthly_updates(self):
         """Ingest monthly delta updates using individual upserts for A/C/D record handling."""
         logger.info("Starting monthly updates ingestion with individual upserts for A/C/D handling")
-        
+
         conn = await self.get_database_connection()
         try:
-            # Use smaller batches and individual upserts for monthly deltas
             await self.stream_csv_data(conn, LAND_REGISTRY_URLS['monthly'], batch_size=500, bulk_mode=False)
             await self.refresh_materialized_views(conn)
-            
+
             freshness = await self.get_data_freshness(conn)
             logger.info("Monthly updates complete", stats=self.session_stats, freshness=freshness)
-            
+
+        finally:
+            await conn.close()
+
+    async def get_covered_months(self, conn: psycopg.AsyncConnection) -> List[date]:
+        """Return sorted list of year-months that have transaction data."""
+        async with conn.cursor() as cursor:
+            await cursor.execute("""
+                SELECT DISTINCT DATE_TRUNC('month', date)::date AS month
+                FROM transactions
+                WHERE ppd_type = 'A' AND record_status = 'A'
+                ORDER BY month
+            """)
+            rows = await cursor.fetchall()
+        return [r[0] for r in rows]
+
+    async def detect_missing_months(self, conn: psycopg.AsyncConnection) -> List[date]:
+        """Return months from earliest data to last complete month that have no transactions."""
+        covered = set(await self.get_covered_months(conn))
+        if not covered:
+            return []
+        start = min(covered)
+        end = date.today().replace(day=1)  # exclusive: current month may be incomplete
+        missing = []
+        cur = start
+        while cur < end:
+            if cur not in covered:
+                missing.append(cur)
+            _, days_in_month = calendar.monthrange(cur.year, cur.month)
+            cur = (cur + timedelta(days=days_in_month)).replace(day=1)
+        return missing
+
+    async def ingest_backfill(self):
+        """Detect missing months and backfill by re-ingesting the affected years."""
+        conn = await self.get_database_connection()
+        try:
+            missing = await self.detect_missing_months(conn)
+            if not missing:
+                logger.info("No missing months detected — nothing to backfill")
+                return
+            years_to_backfill = sorted({m.year for m in missing})
+            logger.info("Missing months detected", count=len(missing), years=years_to_backfill,
+                        months=[m.isoformat() for m in missing])
+            for year in years_to_backfill:
+                logger.info("Backfilling year", year=year)
+                await self.ingest_yearly_data(year)
+            freshness = await self.get_data_freshness(conn)
+            logger.info("Backfill complete", years=years_to_backfill, freshness=freshness)
         finally:
             await conn.close()
 
 @click.command()
-@click.option('--mode', 
-              type=click.Choice(['full', 'yearly', 'monthly', 'postcode-lookup']), 
+@click.option('--mode',
+              type=click.Choice(['full', 'yearly', 'monthly', 'backfill', 'postcode-lookup']),
               required=True,
               help='Ingestion mode')
 @click.option('--year', 
@@ -471,6 +520,8 @@ def main(mode: str, year: Optional[int], force_bulk: bool, log_level: str):
             asyncio.run(ingestor.ingest_yearly_data(year, force_bulk=force_bulk))
         elif mode == 'monthly':
             asyncio.run(ingestor.ingest_monthly_updates())
+        elif mode == 'backfill':
+            asyncio.run(ingestor.ingest_backfill())
         elif mode == 'postcode-lookup':
             click.echo("Postcode lookup ingestion not yet implemented", err=True)
             sys.exit(1)

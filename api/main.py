@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -8,7 +7,6 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.responses import JSONResponse
 
 sys.path.insert(0, "/app")
 from ingest import LandRegistryIngestor
@@ -30,18 +28,6 @@ OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'qwen2.5:1.5b')
 
 app = FastAPI(root_path="/api", title="UK House Prices API")
-
-
-def run_job(job_id: str, coro):
-    async def _run():
-        jobs[job_id] = {"status": "running"}
-        try:
-            await coro
-            jobs[job_id] = {"status": "complete"}
-        except Exception as e:
-            jobs[job_id] = {"status": "failed", "error": str(e)}
-
-    asyncio.create_task(_run())
 
 
 @app.get("/health")
@@ -85,6 +71,43 @@ async def ingest_yearly(year: int, background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_job)
     return {"job_id": job_id, "status": "accepted"}
+
+
+@app.post("/ingest/backfill", status_code=202)
+async def ingest_backfill(background_tasks: BackgroundTasks):
+    job_id = "backfill"
+    if jobs.get(job_id, {}).get("status") == "running":
+        raise HTTPException(409, "Backfill already running")
+
+    async def _job():
+        jobs[job_id] = {"status": "running"}
+        try:
+            await LandRegistryIngestor().ingest_backfill()
+            jobs[job_id] = {"status": "complete"}
+            _summary_cache.clear()
+        except Exception as e:
+            jobs[job_id] = {"status": "failed", "error": str(e)}
+
+    background_tasks.add_task(_job)
+    return {"job_id": job_id, "status": "accepted"}
+
+
+@app.get("/ingest/coverage")
+async def ingest_coverage():
+    conn = await psycopg.AsyncConnection.connect(**DB_CONFIG)
+    await conn.set_autocommit(True)
+    try:
+        ingestor = LandRegistryIngestor()
+        covered = await ingestor.get_covered_months(conn)
+        missing = await ingestor.detect_missing_months(conn)
+        return {
+            "covered_months": [m.isoformat() for m in covered],
+            "missing_months": [m.isoformat() for m in missing],
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Coverage check failed: {e}")
+    finally:
+        await conn.close()
 
 
 @app.get("/ingest/{job_id}/status")
