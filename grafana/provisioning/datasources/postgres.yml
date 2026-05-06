@@ -6,8 +6,8 @@ datasources:
     uid: house-prices-postgres
     access: proxy
     url: postgres:5432
-    database: ${POSTGRES_DB:-house_prices}
-    user: ${POSTGRES_USER:-prices}
+    database: ${POSTGRES_DB}
+    user: ${POSTGRES_USER}
     secureJsonData:
       password: ${POSTGRES_PASSWORD}
     jsonData:
