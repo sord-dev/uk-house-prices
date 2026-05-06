@@ -119,19 +119,14 @@ async def get_monthly_summary_data() -> List[Dict]:
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
                     FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
                         AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as prev_month_median,
-                ROUND((100.0 * (
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                ) / NULLIF(
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                , 0))::NUMERIC, 1) as mom_change_pct,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
+                    FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '13 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '12 months') as same_month_last_year_median,
                 to_char(date_trunc('month', CURRENT_DATE) - INTERVAL '1 month', 'FMMonth YYYY') as reporting_month
             FROM transactions
             WHERE ppd_type = 'A'
               AND record_status = 'A'
-              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '13 months'
               AND UPPER(county) != 'GREATER LONDON'
             GROUP BY county
 
@@ -147,25 +142,29 @@ async def get_monthly_summary_data() -> List[Dict]:
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
                     FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
                         AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as prev_month_median,
-                ROUND((100.0 * (
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                ) / NULLIF(
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                , 0))::NUMERIC, 1) as mom_change_pct,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
+                    FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '13 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '12 months') as same_month_last_year_median,
                 to_char(date_trunc('month', CURRENT_DATE) - INTERVAL '1 month', 'FMMonth YYYY') as reporting_month
             FROM transactions
             WHERE ppd_type = 'A'
               AND record_status = 'A'
-              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '13 months'
               AND UPPER(county) = 'GREATER LONDON'
               AND district IS NOT NULL
             GROUP BY district
+        ),
+        with_changes AS (
+            SELECT *,
+                ROUND((100.0 * (prev_month_median - same_month_last_year_median)
+                    / NULLIF(same_month_last_year_median, 0))::NUMERIC, 1) as yoy_change_pct,
+                ROUND((100.0 * (current_month_median - prev_month_median)
+                    / NULLIF(prev_month_median, 0))::NUMERIC, 1) as mom_change_pct
+            FROM area_data
         )
-        SELECT area_name, area_type, transactions, current_month_median, prev_month_median, mom_change_pct, reporting_month
-        FROM area_data
+        SELECT area_name, area_type, transactions, current_month_median, prev_month_median,
+               same_month_last_year_median, mom_change_pct, yoy_change_pct, reporting_month
+        FROM with_changes
         WHERE transactions > 10
           {area_filter}
         ORDER BY transactions DESC;
@@ -200,16 +199,22 @@ def _select_notable(data: List[Dict]) -> Dict:
     reporting_month = data[0].get('reporting_month') or 'Unknown'
     total_tx = sum(int(r['transactions']) for r in data)
     with_mom = [r for r in data if r['mom_change_pct'] is not None and r['current_month_median']]
+    with_yoy = [r for r in data if r['yoy_change_pct'] is not None and r['same_month_last_year_median']]
     top_by_volume = data if len(data) <= 15 else data[:10]
     top_gainers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']), reverse=True)[:3]
     top_fallers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']))[:3]
+    top_yoy_gainers = sorted(with_yoy, key=lambda r: float(r['yoy_change_pct']), reverse=True)[:3]
+    top_yoy_fallers = sorted(with_yoy, key=lambda r: float(r['yoy_change_pct']))[:3]
     return {
         "reporting_month": reporting_month,
         "total_tx": total_tx,
         "with_mom": with_mom,
+        "with_yoy": with_yoy,
         "top_by_volume": top_by_volume,
         "top_gainers": top_gainers,
         "top_fallers": top_fallers,
+        "top_yoy_gainers": top_yoy_gainers,
+        "top_yoy_fallers": top_yoy_fallers,
     }
 
 
@@ -220,8 +225,19 @@ def _serialise_area(row: Dict) -> Dict:
         "transactions": int(row['transactions']),
         "current_month_median": int(row['current_month_median']) if row['current_month_median'] else None,
         "prev_month_median": int(row['prev_month_median']) if row['prev_month_median'] else None,
+        "same_month_last_year_median": int(row['same_month_last_year_median']) if row['same_month_last_year_median'] else None,
         "mom_change_pct": float(row['mom_change_pct']) if row['mom_change_pct'] is not None else None,
+        "yoy_change_pct": float(row['yoy_change_pct']) if row['yoy_change_pct'] is not None else None,
     }
+
+
+def _format_row_yoy(row: Dict) -> str:
+    area = (row['area_name'] or 'Unknown').title()
+    area_type = row['area_type'] or 'Area'
+    yoy = float(row['yoy_change_pct'])
+    prev_med = row['prev_month_median']
+    prev_str = f", median £{int(prev_med):,}" if prev_med else ""
+    return f"{area} ({area_type}){prev_str}, {yoy:+.1f}% YoY"
 
 
 async def generate_ai_summary(notable: Dict) -> str:
@@ -229,12 +245,18 @@ async def generate_ai_summary(notable: Dict) -> str:
     reporting_month = notable['reporting_month']
     total_tx = notable['total_tx']
     with_mom = notable['with_mom']
+    with_yoy = notable['with_yoy']
     top_by_volume = notable['top_by_volume']
     top_gainers = notable['top_gainers']
     top_fallers = notable['top_fallers']
+    top_yoy_gainers = notable['top_yoy_gainers']
+    top_yoy_fallers = notable['top_yoy_fallers']
 
     def section(rows: List[Dict]) -> str:
         return "\n".join(f"  {_format_row(r)}" for r in rows)
+
+    def section_yoy(rows: List[Dict]) -> str:
+        return "\n".join(f"  {_format_row_yoy(r)}" for r in rows)
 
     movers_block = ""
     if with_mom:
@@ -245,12 +267,24 @@ Biggest price increases (MoM):
 Biggest price falls (MoM):
 {section(top_fallers)}"""
     else:
-        movers_block = "\nNote: Month-over-month price comparison data is not yet available for this reporting period — do not comment on price direction."
+        movers_block = "\nNote: Month-over-month price comparison data is not yet available for this reporting period — do not comment on MoM price direction."
 
+    yoy_block = ""
+    if with_yoy:
+        yoy_block = f"""
+Biggest year-on-year increases:
+{section_yoy(top_yoy_gainers)}
+
+Biggest year-on-year falls:
+{section_yoy(top_yoy_fallers)}"""
+    else:
+        yoy_block = "\nNote: Year-on-year comparison data is not available — do not comment on annual price direction."
+
+    has_movers = bool(with_mom or with_yoy)
     sentence_3_instruction = (
-        "Name the biggest price gainer and biggest price faller with their MoM percentages."
-        if with_mom else
-        "State that month-over-month price comparison data is not yet available for this period."
+        "Highlight the single most notable price mover (MoM or YoY) with its percentage."
+        if has_movers else
+        "State that price comparison data is not yet available for this period."
     )
 
     prompt = f"""You are a UK property market analyst. Write a push notification briefing of exactly 3 sentences.
@@ -272,7 +306,8 @@ Areas monitored: {len(top_by_volume)}
 
 Markets by volume:
 {section(top_by_volume)}
-{movers_block}"""
+{movers_block}
+{yoy_block}"""
 
     payload = {
         "model": OLLAMA_MODEL,
@@ -320,6 +355,8 @@ async def summarise_monthly():
                 "top_by_volume": [_serialise_area(r) for r in notable["top_by_volume"]],
                 "top_gainers": [_serialise_area(r) for r in notable["top_gainers"]],
                 "top_fallers": [_serialise_area(r) for r in notable["top_fallers"]],
+                "top_yoy_gainers": [_serialise_area(r) for r in notable["top_yoy_gainers"]],
+                "top_yoy_fallers": [_serialise_area(r) for r in notable["top_yoy_fallers"]],
             },
         }
         _summary_cache[cache_key] = result
