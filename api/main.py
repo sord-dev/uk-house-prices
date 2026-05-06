@@ -14,9 +14,15 @@ from fastapi.responses import JSONResponse
 sys.path.insert(0, "/app")
 from ingest import LandRegistryIngestor
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+        # Configure logging to ensure it shows up
+        import sys
+        logging.basicConfig(
+            level=logging.INFO, 
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            stream=sys.stdout,
+            force=True
+        )
+        logger = logging.getLogger(__name__)
 
 jobs: dict = {}
 
@@ -125,7 +131,10 @@ async def get_monthly_summary_data() -> List[Dict]:
         async with conn.cursor(row_factory=dict_row) as cursor:
             await cursor.execute(debug_query)
             debug_results = await cursor.fetchall()
-            logger.info(f"DEBUG - Recent months data: {[dict(row) for row in debug_results]}")
+        # Force log to stdout immediately
+        import sys
+        sys.stdout.write(f"DEBUG - Recent months data: {[dict(row) for row in debug_results]}\n")
+        sys.stdout.flush()
         
         query = f"""
         WITH monthly_ranges AS (
@@ -205,7 +214,10 @@ async def get_monthly_summary_data() -> List[Dict]:
             
         await conn.close()
         result_data = [dict(row) for row in results]
-        logger.info(f"DEBUG - Query results: {result_data[:3]}")  # Show first 3 results
+        # Force log to stdout immediately
+        import sys
+        sys.stdout.write(f"DEBUG - Query results (first 3): {result_data[:3]}\n")
+        sys.stdout.flush()
         return result_data
         
     except Exception as e:
@@ -267,11 +279,14 @@ Property Market Data for May 2026:{formatted_data}"""
 
 
 @app.post("/summarise/monthly")
-async def summarise_monthly():
+async def summarise_monthly(debug: bool = False):
     """Generate AI summary of recent monthly house price data."""
     try:
         # Get data from database
         data = await get_monthly_summary_data()
+        
+        if debug:
+            return {"debug_data": data}
         
         # Generate AI summary
         summary = await generate_ai_summary(data)
