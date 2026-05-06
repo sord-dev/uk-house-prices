@@ -203,26 +203,33 @@ async def generate_ai_summary(data: List[Dict]) -> str:
 
     with_mom = [r for r in data if r['mom_change_pct'] is not None and r['current_month_median']]
 
-    top_by_volume = data[:5]
+    # Show all areas if small dataset, otherwise top 10
+    top_by_volume = data if len(data) <= 15 else data[:10]
     top_gainers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']), reverse=True)[:3]
     top_fallers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']))[:3]
 
     def section(rows: List[Dict]) -> str:
-        return "\n".join(f"  {_format_row(r)}" for r in rows) or "  No data"
+        return "\n".join(f"  {_format_row(r)}" for r in rows)
 
-    prompt = f"""You are a UK property market analyst. Write a 3-5 sentence plain English briefing suitable for a push notification. Be specific with numbers. Do not speculate beyond the data. Start with the national picture, then highlight the biggest movers.
-
-Reporting period: {reporting_month}
-Total transactions recorded: {total_tx:,}
-
-Top markets by volume:
-{section(top_by_volume)}
-
+    movers_block = ""
+    if with_mom:
+        movers_block = f"""
 Biggest price increases (MoM):
 {section(top_gainers)}
 
 Biggest price falls (MoM):
 {section(top_fallers)}"""
+    else:
+        movers_block = "\nNote: Month-over-month price comparison data is not yet available for this reporting period — do not comment on price direction."
+
+    prompt = f"""You are a UK property market analyst. Write a 3-5 sentence plain English briefing suitable for a push notification. Be specific with numbers. Do not speculate beyond the data. Start with the national picture, then highlight notable areas.
+
+Reporting period: {reporting_month}
+Total transactions recorded: {total_tx:,}
+
+Markets by volume:
+{section(top_by_volume)}
+{movers_block}"""
     
     payload = {
         "model": OLLAMA_MODEL,
