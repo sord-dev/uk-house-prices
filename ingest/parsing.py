@@ -7,16 +7,9 @@ and geographic filtering for target counties.
 """
 
 import csv
-import os
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
-
-# Load target counties from environment
-TARGET_COUNTIES = [
-    county.strip().upper() 
-    for county in os.getenv('TARGET_COUNTIES', 'ESSEX,HERTFORDSHIRE,KENT,SURREY,CAMBRIDGESHIRE').split(',')
-]
 
 
 class ParseResult(Enum):
@@ -86,10 +79,10 @@ def parse_transaction_row(row: List[str]) -> Tuple[ParseResult, Optional[Dict], 
         return ParseResult.PARSE_ERROR, None, str(e)
 
 
-def should_include_transaction(transaction: Dict, target_counties: List[str] = TARGET_COUNTIES) -> bool:
+def should_include_transaction(transaction: Dict, target_counties: Optional[List[str]] = None) -> bool:
     """Check if transaction should be included based on target counties."""
     if not target_counties:
-        return True  # No filter if TARGET_COUNTIES env var is empty
+        return True  # No filter — all transactions ingested by default
     county = transaction.get('county')
     if not county:
         return False

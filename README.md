@@ -20,8 +20,9 @@ HM Land Registry API → FastAPI Service → PostgreSQL 16 → Grafana Dashboard
 - **REST API interface**: HTTP endpoints for all ingestion and analysis operations
 - **Complete historical data**: Ingest full Land Registry dataset (1995-present)
 - **Automated updates**: Monthly delta processing with proper A/C/D record handling
+- **Gap detection & backfill**: Automatically detect missing months and re-ingest affected years
 - **AI-powered summaries**: Generate plain English market briefings via Ollama
-- **Geographic filtering**: Target specific counties for focused analysis
+- **Geographic filtering**: Target specific counties for focused AI summaries and analysis
 - **Performance optimized**: Materialized views and strategic indexes for fast queries
 - **Rich visualizations**: Time series analysis, geographic heatmaps, market statistics
 - **Data quality**: Validates transactions, handles edge cases, structured logging
@@ -40,7 +41,7 @@ HM Land Registry API → FastAPI Service → PostgreSQL 16 → Grafana Dashboard
 # Clone/create project directory
 cd {whatever-dir-you-want}
 
-clone https://github.com/sord-dev/uk-house-prices.git
+git clone https://github.com/sord-dev/uk-house-prices.git
 
 # Copy environment template
 cp .env.example .env
@@ -117,9 +118,16 @@ curl -X POST http://localhost:8001/api/ingest/monthly
 # Yearly data ingestion
 curl -X POST "http://localhost:8001/api/ingest/yearly?year=2024"
 
+# Check which months have data and whether any gaps exist
+curl http://localhost:8001/api/ingest/coverage
+
+# Backfill any missing months (re-ingests the affected years)
+curl -X POST http://localhost:8001/api/ingest/backfill
+
 # Check job status
 curl http://localhost:8001/api/ingest/monthly/status
 curl http://localhost:8001/api/ingest/yearly_2024/status
+curl http://localhost:8001/api/ingest/backfill/status
 
 # Generate AI summary of recent market data
 curl -X POST http://localhost:8001/api/summarise/monthly
@@ -222,7 +230,7 @@ TARGET_COUNTIES=HERTFORDSHIRE,ESSEX,KENT,SURREY
 TARGET_COUNTIES=HERTFORDSHIRE,ESSEX,KENT,SURREY,BUCKINGHAMSHIRE,BERKSHIRE,OXFORDSHIRE
 ```
 
-**Note**: All data is still ingested for the full dataset. `TARGET_COUNTIES` only affects AI summary generation, allowing you to focus notifications on areas of interest while maintaining complete historical data.
+**Note**: All transactions are ingested regardless of `TARGET_COUNTIES`. The filter only applies to AI summary generation and the `/summarise/monthly` query, letting you focus notifications on areas of interest while keeping the full dataset available for Grafana dashboards and ad-hoc queries.
 
 Restart the API service after changing counties:
 ```bash
