@@ -1,8 +1,4 @@
 import os
-import sys
-
-# Ingest package lives at /app (mounted from ./ingest in docker-compose)
-sys.path.insert(0, "/app")
 
 DB_CONFIG = {
     'host': os.getenv('POSTGRES_HOST', 'localhost'),

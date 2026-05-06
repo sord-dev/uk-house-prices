@@ -19,12 +19,6 @@ structlog==24.1.0
 # Date/time utilities
 python-dateutil==2.9.0
 
-# Data validation
-pydantic==2.6.4
-
 # Geospatial libraries
 pyproj==3.6.1
 
-# HTTP Server for auto-ingestion and AI layer
-fastapi==0.111.0
-uvicorn==0.29.0
