@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -13,16 +12,6 @@ from fastapi.responses import JSONResponse
 
 sys.path.insert(0, "/app")
 from ingest import LandRegistryIngestor
-
-        # Configure logging to ensure it shows up
-        import sys
-        logging.basicConfig(
-            level=logging.INFO, 
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            stream=sys.stdout,
-            force=True
-        )
-        logger = logging.getLogger(__name__)
 
 jobs: dict = {}
 
@@ -115,93 +104,64 @@ async def get_monthly_summary_data() -> List[Dict]:
             areas = [f"'{area.strip().upper()}'" for area in target_counties.split(',')]
             area_filter = f"AND UPPER(area_name) IN ({','.join(areas)})"
         
-        # First, let's check what data we actually have for recent months
-        debug_query = """
-        SELECT 
-            DATE_TRUNC('month', date) as month,
-            COUNT(*) as transactions
-        FROM transactions 
-        WHERE ppd_type = 'A' 
-          AND record_status = 'A'
-          AND date >= CURRENT_DATE - INTERVAL '3 months'
-        GROUP BY DATE_TRUNC('month', date)
-        ORDER BY month DESC;
-        """
-        
-        async with conn.cursor(row_factory=dict_row) as cursor:
-            await cursor.execute(debug_query)
-            debug_results = await cursor.fetchall()
-        # Force log to stdout immediately
-        import sys
-        sys.stdout.write(f"DEBUG - Recent months data: {[dict(row) for row in debug_results]}\n")
-        sys.stdout.flush()
-        
         query = f"""
-        WITH monthly_ranges AS (
-            SELECT 
-                date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' as current_month_start,
-                date_trunc('month', CURRENT_DATE) as current_month_end,
-                date_trunc('month', CURRENT_DATE) - INTERVAL '2 months' as previous_month_start,
-                date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' as previous_month_end
-        ),
-        area_data AS (
+        WITH area_data AS (
             -- County-level data
             SELECT
                 county as area_name,
                 'County' as area_type,
                 COUNT(*) as transactions,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
-                    WHERE date >= (SELECT current_month_start FROM monthly_ranges) 
-                    AND date < (SELECT current_month_end FROM monthly_ranges)
-                ) as current_median,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
-                    WHERE date >= (SELECT previous_month_start FROM monthly_ranges) 
-                    AND date < (SELECT previous_month_end FROM monthly_ranges)
-                ) as previous_median
-            FROM transactions, monthly_ranges
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
+                    FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as current_month_median,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
+                    FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as prev_month_median,
+                ROUND((100.0 * (
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                ) / NULLIF(
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                , 0))::NUMERIC, 1) as mom_change_pct,
+                to_char(date_trunc('month', CURRENT_DATE) - INTERVAL '1 month', 'FMMonth YYYY') as reporting_month
+            FROM transactions
             WHERE ppd_type = 'A'
               AND record_status = 'A'
-              AND date >= (SELECT previous_month_start FROM monthly_ranges)
+              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
               AND UPPER(county) != 'GREATER LONDON'
             GROUP BY county
-            
+
             UNION ALL
-            
+
             -- London borough data
             SELECT
                 district as area_name,
                 'London Borough' as area_type,
                 COUNT(*) as transactions,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
-                    WHERE date >= (SELECT current_month_start FROM monthly_ranges) 
-                    AND date < (SELECT current_month_end FROM monthly_ranges)
-                ) as current_median,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
-                    WHERE date >= (SELECT previous_month_start FROM monthly_ranges) 
-                    AND date < (SELECT previous_month_end FROM monthly_ranges)
-                ) as previous_median
-            FROM transactions, monthly_ranges
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
+                    FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as current_month_median,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
+                    FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as prev_month_median,
+                ROUND((100.0 * (
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                ) / NULLIF(
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                , 0))::NUMERIC, 1) as mom_change_pct,
+                to_char(date_trunc('month', CURRENT_DATE) - INTERVAL '1 month', 'FMMonth YYYY') as reporting_month
+            FROM transactions
             WHERE ppd_type = 'A'
               AND record_status = 'A'
-              AND date >= (SELECT previous_month_start FROM monthly_ranges)
+              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
               AND UPPER(county) = 'GREATER LONDON'
               AND district IS NOT NULL
             GROUP BY district
         )
-        SELECT 
-            area_name, 
-            area_type, 
-            transactions, 
-            median_price,
-            current_median,
-            previous_median,
-            CASE 
-                WHEN previous_median > 0 AND current_median IS NOT NULL THEN
-                    ROUND(((current_median - previous_median) / previous_median * 100.0)::NUMERIC, 1)
-                ELSE NULL 
-            END as mom_change_pct
+        SELECT area_name, area_type, transactions, current_month_median, prev_month_median, mom_change_pct, reporting_month
         FROM area_data
         WHERE transactions > 10
           {area_filter}
@@ -213,45 +173,56 @@ async def get_monthly_summary_data() -> List[Dict]:
             results = await cursor.fetchall()
             
         await conn.close()
-        result_data = [dict(row) for row in results]
-        # Force log to stdout immediately
-        import sys
-        sys.stdout.write(f"DEBUG - Query results (first 3): {result_data[:3]}\n")
-        sys.stdout.flush()
-        return result_data
+        return [dict(row) for row in results]
         
     except Exception as e:
-        logger.error(f"DEBUG - Database error: {e}")
         raise HTTPException(500, f"Database query failed: {e}")
 
 
+def _format_row(row: Dict) -> str:
+    area = row['area_name'] or 'Unknown'
+    area_type = row['area_type'] or 'Area'
+    tx = int(row['transactions'])
+    median = row['current_month_median']
+    median_str = f"median £{int(median):,}" if median else "median N/A"
+    mom = row['mom_change_pct']
+    mom_str = f"{float(mom):+.1f}% MoM" if mom is not None else ""
+    parts = [f"{area} ({area_type}): {tx:,} tx, {median_str}"]
+    if mom_str:
+        parts[0] += f", {mom_str}"
+    return parts[0]
+
+
 async def generate_ai_summary(data: List[Dict]) -> str:
-    """Send data to Ollama for AI summary generation."""
+    """Send pre-selected notable data to Ollama for AI summary generation."""
     if not data:
         raise HTTPException(503, "No data available for summary")
-    
-    # Format data for the prompt with explicit details
-    formatted_data = ""
-    for row in data:
-        area_name = row['area_name'] or 'Unknown'
-        area_type = row['area_type'] or 'Area'
-        transactions = int(row['transactions'])
-        median_price = int(row['median_price']) if row['median_price'] else 0
-        current_median = int(row['current_median']) if row['current_median'] else None
-        previous_median = int(row['previous_median']) if row['previous_median'] else None
-        mom_change = float(row['mom_change_pct']) if row['mom_change_pct'] is not None else None
-        
-        change_str = f"{mom_change:+.1f}%" if mom_change is not None else "no data"
-        current_str = f"£{current_median:,}" if current_median else "no current data"
-        previous_str = f"£{previous_median:,}" if previous_median else "no previous data"
-        
-        formatted_data += f"\n{area_name} ({area_type}): {transactions:,} total transactions over 2 months, overall median £{median_price:,}, current month median {current_str}, previous month median {previous_str}, month-over-month change {change_str}"
-    
-    logger.info(f"DEBUG - Formatted data for AI: {formatted_data[:500]}...")  # Log first 500 chars
-    
-    prompt = f"""You are a UK property market analyst. Given the following monthly property market data for May 2026, write a 3-5 sentence plain english briefing suitable for a push notification. Be specific with the actual numbers provided. Focus on the month-over-month changes and current median prices. Do not speculate beyond the data provided.
 
-Property Market Data for May 2026:{formatted_data}"""
+    reporting_month = data[0].get('reporting_month') or 'Unknown'
+    total_tx = sum(int(r['transactions']) for r in data)
+
+    with_mom = [r for r in data if r['mom_change_pct'] is not None and r['current_month_median']]
+
+    top_by_volume = data[:5]
+    top_gainers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']), reverse=True)[:3]
+    top_fallers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']))[:3]
+
+    def section(rows: List[Dict]) -> str:
+        return "\n".join(f"  {_format_row(r)}" for r in rows) or "  No data"
+
+    prompt = f"""You are a UK property market analyst. Write a 3-5 sentence plain English briefing suitable for a push notification. Be specific with numbers. Do not speculate beyond the data. Start with the national picture, then highlight the biggest movers.
+
+Reporting period: {reporting_month}
+Total transactions recorded: {total_tx:,}
+
+Top markets by volume:
+{section(top_by_volume)}
+
+Biggest price increases (MoM):
+{section(top_gainers)}
+
+Biggest price falls (MoM):
+{section(top_fallers)}"""
     
     payload = {
         "model": OLLAMA_MODEL,
@@ -279,20 +250,13 @@ Property Market Data for May 2026:{formatted_data}"""
 
 
 @app.post("/summarise/monthly")
-async def summarise_monthly(debug: bool = False):
+async def summarise_monthly():
     """Generate AI summary of recent monthly house price data."""
     try:
-        # Get data from database
         data = await get_monthly_summary_data()
-        
-        if debug:
-            return {"debug_data": data}
-        
-        # Generate AI summary
         summary = await generate_ai_summary(data)
-        
-        return {"summary": summary}
-        
+        reporting_month = data[0].get('reporting_month') if data else None
+        return {"summary": summary, "data_period": reporting_month, "areas_analysed": len(data)}
     except HTTPException:
         raise
     except Exception as e:
