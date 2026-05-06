@@ -222,19 +222,32 @@ Biggest price falls (MoM):
     else:
         movers_block = "\nNote: Month-over-month price comparison data is not yet available for this reporting period — do not comment on price direction."
 
-    prompt = f"""You are a UK property market analyst. Write a 3-5 sentence plain English briefing suitable for a push notification. Be specific with numbers. Do not speculate beyond the data. Start with the national picture, then highlight notable areas.
+    prompt = f"""You are a UK property market analyst writing a push notification briefing.
 
+RULES:
+- Use ONLY the numbers provided below. Do not invent any figures.
+- If a median price is N/A, do not mention price for that area.
+- Do not say prices are "not disclosed" or "unavailable" — just omit them.
+- Write exactly 3 sentences. No more.
+
+Sentence 1: State the reporting period, total transaction count, and number of areas monitored.
+Sentence 2: Name the top 2-3 areas by transaction volume with their counts and median prices (if available).
+Sentence 3: {('Name the biggest price gainer and faller with their MoM percentages.') if with_mom else ('Note that month-over-month price data is not yet available for this period.')}
+
+DATA:
 Reporting period: {reporting_month}
-Total transactions recorded: {total_tx:,}
+Total transactions: {total_tx:,}
+Areas monitored: {len(data)}
 
 Markets by volume:
 {section(top_by_volume)}
 {movers_block}"""
-    
+
     payload = {
         "model": OLLAMA_MODEL,
         "prompt": prompt,
-        "stream": False
+        "stream": False,
+        "options": {"temperature": 0.1},
     }
     
     try:
