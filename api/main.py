@@ -97,33 +97,64 @@ async def get_monthly_summary_data() -> List[Dict]:
         conn = await psycopg.AsyncConnection.connect(**DB_CONFIG)
         await conn.set_autocommit(True)
         
-        # Build county filter if TARGET_COUNTIES is specified
+        # Build filter for both counties and London boroughs if TARGET_COUNTIES is specified
         target_counties = os.getenv('TARGET_COUNTIES')
-        county_filter = ""
+        area_filter = ""
         if target_counties:
-            counties = [f"'{county.strip().upper()}'" for county in target_counties.split(',')]
-            county_filter = f"AND UPPER(county) IN ({','.join(counties)})"
+            areas = [f"'{area.strip().upper()}'" for area in target_counties.split(',')]
+            area_filter = f"AND UPPER(area_name) IN ({','.join(areas)})"
         
         query = f"""
-        SELECT
-            county,
-            COUNT(*) as transactions,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
-            ROUND((100.0 * (
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                    AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-            ) / NULLIF(
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                    AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-            , 0))::NUMERIC, 1) as mom_change_pct
-        FROM transactions
-        WHERE ppd_type = 'A'
-          AND record_status = 'A'
-          AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-          {county_filter}
-        GROUP BY county
-        HAVING COUNT(*) > 10
+        WITH area_data AS (
+            -- County-level data
+            SELECT
+                county as area_name,
+                'County' as area_type,
+                COUNT(*) as transactions,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
+                ROUND((100.0 * (
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                ) / NULLIF(
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                , 0))::NUMERIC, 1) as mom_change_pct
+            FROM transactions
+            WHERE ppd_type = 'A'
+              AND record_status = 'A'
+              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+              AND UPPER(county) != 'GREATER LONDON'
+            GROUP BY county
+            
+            UNION ALL
+            
+            -- London borough data
+            SELECT
+                district as area_name,
+                'London Borough' as area_type,
+                COUNT(*) as transactions,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
+                ROUND((100.0 * (
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                ) / NULLIF(
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
+                , 0))::NUMERIC, 1) as mom_change_pct
+            FROM transactions
+            WHERE ppd_type = 'A'
+              AND record_status = 'A'
+              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+              AND UPPER(county) = 'GREATER LONDON'
+              AND district IS NOT NULL
+            GROUP BY district
+        )
+        SELECT area_name, area_type, transactions, median_price, mom_change_pct
+        FROM area_data
+        WHERE transactions > 10
+          {area_filter}
         ORDER BY transactions DESC;
         """
         
@@ -146,12 +177,13 @@ async def generate_ai_summary(data: List[Dict]) -> str:
     # Format data for the prompt
     formatted_data = ""
     for row in data:
-        county = row['county'] or 'Unknown'
+        area_name = row['area_name'] or 'Unknown'
+        area_type = row['area_type'] or 'Area'
         transactions = int(row['transactions'])
         median_price = int(row['median_price']) if row['median_price'] else 0
         mom_change = float(row['mom_change_pct']) if row['mom_change_pct'] is not None else 0
         
-        formatted_data += f"\n{county}: {transactions:,} transactions, median £{median_price:,}, {mom_change:+.1f}% MoM change"
+        formatted_data += f"\n{area_name} ({area_type}): {transactions:,} transactions, median £{median_price:,}, {mom_change:+.1f}% MoM change"
     
     prompt = f"""You are a UK property market analyst. Given the following monthly data, write a 3-5 sentence plain english briefing suitable for a push notification. Be specific with numbers. Do not speculate beyond the data.
 
