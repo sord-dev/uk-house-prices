@@ -107,6 +107,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-prices}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       TARGET_COUNTIES: ${TARGET_COUNTIES}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://192.168.10.11:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
     volumes:
       - ./logs:/app/logs
       - ./api:/api  # mounts api/main.py

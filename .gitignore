@@ -48,6 +48,10 @@ Thumbs.db
 *.tmp
 *.log
 
+# AI Slop
+.claude/**
+.claude
+
 # Backups
 backup_*.sql.gz
 
