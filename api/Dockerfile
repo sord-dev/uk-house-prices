@@ -4,8 +4,9 @@ WORKDIR /
 
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-COPY api/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY ingest/requirements.txt /tmp/ingest-requirements.txt
+COPY api/requirements.txt /tmp/api-requirements.txt
+RUN pip install --no-cache-dir -r /tmp/ingest-requirements.txt -r /tmp/api-requirements.txt
 
 COPY ingest/ /app/
 COPY api/ /api/
