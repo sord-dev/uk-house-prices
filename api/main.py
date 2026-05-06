@@ -104,26 +104,51 @@ async def get_monthly_summary_data() -> List[Dict]:
             areas = [f"'{area.strip().upper()}'" for area in target_counties.split(',')]
             area_filter = f"AND UPPER(area_name) IN ({','.join(areas)})"
         
+        # First, let's check what data we actually have for recent months
+        debug_query = """
+        SELECT 
+            DATE_TRUNC('month', date) as month,
+            COUNT(*) as transactions
+        FROM transactions 
+        WHERE ppd_type = 'A' 
+          AND record_status = 'A'
+          AND date >= CURRENT_DATE - INTERVAL '3 months'
+        GROUP BY DATE_TRUNC('month', date)
+        ORDER BY month DESC;
+        """
+        
+        async with conn.cursor(row_factory=dict_row) as cursor:
+            await cursor.execute(debug_query)
+            debug_results = await cursor.fetchall()
+            print(f"DEBUG - Recent months data: {[dict(row) for row in debug_results]}")
+        
         query = f"""
-        WITH area_data AS (
+        WITH monthly_ranges AS (
+            SELECT 
+                date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' as current_month_start,
+                date_trunc('month', CURRENT_DATE) as current_month_end,
+                date_trunc('month', CURRENT_DATE) - INTERVAL '2 months' as previous_month_start,
+                date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' as previous_month_end
+        ),
+        area_data AS (
             -- County-level data
             SELECT
                 county as area_name,
                 'County' as area_type,
                 COUNT(*) as transactions,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
-                ROUND((100.0 * (
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                ) / NULLIF(
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                , 0))::NUMERIC, 1) as mom_change_pct
-            FROM transactions
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
+                    WHERE date >= (SELECT current_month_start FROM monthly_ranges) 
+                    AND date < (SELECT current_month_end FROM monthly_ranges)
+                ) as current_median,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
+                    WHERE date >= (SELECT previous_month_start FROM monthly_ranges) 
+                    AND date < (SELECT previous_month_end FROM monthly_ranges)
+                ) as previous_median
+            FROM transactions, monthly_ranges
             WHERE ppd_type = 'A'
               AND record_status = 'A'
-              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+              AND date >= (SELECT previous_month_start FROM monthly_ranges)
               AND UPPER(county) != 'GREATER LONDON'
             GROUP BY county
             
@@ -135,23 +160,34 @@ async def get_monthly_summary_data() -> List[Dict]:
                 'London Borough' as area_type,
                 COUNT(*) as transactions,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
-                ROUND((100.0 * (
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                    - PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                ) / NULLIF(
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
-                        AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')
-                , 0))::NUMERIC, 1) as mom_change_pct
-            FROM transactions
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
+                    WHERE date >= (SELECT current_month_start FROM monthly_ranges) 
+                    AND date < (SELECT current_month_end FROM monthly_ranges)
+                ) as current_median,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) FILTER (
+                    WHERE date >= (SELECT previous_month_start FROM monthly_ranges) 
+                    AND date < (SELECT previous_month_end FROM monthly_ranges)
+                ) as previous_median
+            FROM transactions, monthly_ranges
             WHERE ppd_type = 'A'
               AND record_status = 'A'
-              AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+              AND date >= (SELECT previous_month_start FROM monthly_ranges)
               AND UPPER(county) = 'GREATER LONDON'
               AND district IS NOT NULL
             GROUP BY district
         )
-        SELECT area_name, area_type, transactions, median_price, mom_change_pct
+        SELECT 
+            area_name, 
+            area_type, 
+            transactions, 
+            median_price,
+            current_median,
+            previous_median,
+            CASE 
+                WHEN previous_median > 0 AND current_median IS NOT NULL THEN
+                    ROUND(((current_median - previous_median) / previous_median * 100.0)::NUMERIC, 1)
+                ELSE NULL 
+            END as mom_change_pct
         FROM area_data
         WHERE transactions > 10
           {area_filter}
@@ -163,9 +199,12 @@ async def get_monthly_summary_data() -> List[Dict]:
             results = await cursor.fetchall()
             
         await conn.close()
-        return [dict(row) for row in results]
+        result_data = [dict(row) for row in results]
+        print(f"DEBUG - Query results: {result_data[:3]}")  # Show first 3 results
+        return result_data
         
     except Exception as e:
+        print(f"DEBUG - Database error: {e}")
         raise HTTPException(500, f"Database query failed: {e}")
 
 
