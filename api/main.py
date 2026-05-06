@@ -14,6 +14,7 @@ sys.path.insert(0, "/app")
 from ingest import LandRegistryIngestor
 
 jobs: dict = {}
+_summary_cache: Dict[str, dict] = {}
 
 # Database configuration
 DB_CONFIG = {
@@ -59,6 +60,7 @@ async def ingest_monthly(background_tasks: BackgroundTasks):
         try:
             await LandRegistryIngestor().ingest_monthly_updates()
             jobs[job_id] = {"status": "complete"}
+            _summary_cache.clear()
         except Exception as e:
             jobs[job_id] = {"status": "failed", "error": str(e)}
 
@@ -77,6 +79,7 @@ async def ingest_yearly(year: int, background_tasks: BackgroundTasks):
         try:
             await LandRegistryIngestor().ingest_yearly_data(year)
             jobs[job_id] = {"status": "complete"}
+            _summary_cache.clear()
         except Exception as e:
             jobs[job_id] = {"status": "failed", "error": str(e)}
 
@@ -305,8 +308,11 @@ async def summarise_monthly():
         if not data:
             raise HTTPException(503, "No data available for summary")
         notable = _select_notable(data)
+        cache_key = notable["reporting_month"]
+        if cache_key in _summary_cache:
+            return _summary_cache[cache_key]
         summary = await generate_ai_summary(notable)
-        return {
+        result = {
             "summary": summary,
             "data_period": notable["reporting_month"],
             "areas_analysed": len(data),
@@ -316,6 +322,8 @@ async def summarise_monthly():
                 "top_fallers": [_serialise_area(r) for r in notable["top_fallers"]],
             },
         }
+        _summary_cache[cache_key] = result
+        return result
     except HTTPException:
         raise
     except Exception as e:
