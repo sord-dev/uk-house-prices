@@ -222,19 +222,25 @@ Biggest price falls (MoM):
     else:
         movers_block = "\nNote: Month-over-month price comparison data is not yet available for this reporting period — do not comment on price direction."
 
-    prompt = f"""You are a UK property market analyst writing a push notification briefing.
+    sentence_3_instruction = (
+        "Name the biggest price gainer and biggest price faller with their MoM percentages."
+        if with_mom else
+        "State that month-over-month price comparison data is not yet available for this period."
+    )
 
-RULES:
-- Use ONLY the numbers provided below. Do not invent any figures.
-- If a median price is N/A, do not mention price for that area.
-- Do not say prices are "not disclosed" or "unavailable" — just omit them.
-- Write exactly 3 sentences. No more.
+    prompt = f"""You are a UK property market analyst. Write a push notification briefing of exactly 3 sentences.
 
-Sentence 1: State the reporting period, total transaction count, and number of areas monitored.
-Sentence 2: Name the top 2-3 areas by transaction volume with their counts and median prices (if available).
-Sentence 3: {('Name the biggest price gainer and faller with their MoM percentages.') if with_mom else ('Note that month-over-month price data is not yet available for this period.')}
+Rules:
+- Use ONLY the numbers provided. Do not invent any figures.
+- If a median is N/A, skip price for that area entirely — do not say "not available".
+- Do not include labels like "Sentence 1" in your output — just write the sentences.
 
-DATA:
+What each sentence must cover:
+1. The reporting period, total transaction count, and number of areas monitored.
+2. The top 2-3 areas by transaction volume, with counts and medians where available.
+3. {sentence_3_instruction}
+
+Data:
 Reporting period: {reporting_month}
 Total transactions: {total_tx:,}
 Areas monitored: {len(data)}
