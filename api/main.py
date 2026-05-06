@@ -97,7 +97,14 @@ async def get_monthly_summary_data() -> List[Dict]:
         conn = await psycopg.AsyncConnection.connect(**DB_CONFIG)
         await conn.set_autocommit(True)
         
-        query = """
+        # Build county filter if TARGET_COUNTIES is specified
+        target_counties = os.getenv('TARGET_COUNTIES')
+        county_filter = ""
+        if target_counties:
+            counties = [f"'{county.strip().upper()}'" for county in target_counties.split(',')]
+            county_filter = f"AND UPPER(county) IN ({','.join(counties)})"
+        
+        query = f"""
         SELECT
             county,
             COUNT(*) as transactions,
@@ -114,6 +121,7 @@ async def get_monthly_summary_data() -> List[Dict]:
         WHERE ppd_type = 'A'
           AND record_status = 'A'
           AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+          {county_filter}
         GROUP BY county
         HAVING COUNT(*) > 10
         ORDER BY transactions DESC;

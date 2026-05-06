@@ -9,16 +9,19 @@ A self-hosted data pipeline that ingests HM Land Registry Price Paid Data into P
 ## Architecture
 
 ```
-HM Land Registry API → Python Ingest Service → PostgreSQL 16 → Grafana Dashboard
-                    ↓                            ↑
-                ONS Postcode API         Materialized Views & Indexes
+HM Land Registry API → FastAPI Service → PostgreSQL 16 → Grafana Dashboard
+                    ↓        ↓             ↑
+                ONS API   Ollama AI    Materialized Views
+                         (Summary)    & Indexes
 ```
 
 ## Features
 
+- **REST API interface**: HTTP endpoints for all ingestion and analysis operations
 - **Complete historical data**: Ingest full Land Registry dataset (1995-present)
 - **Automated updates**: Monthly delta processing with proper A/C/D record handling
-- **Geographic filtering**: Target specific counties to keep dataset focused
+- **AI-powered summaries**: Generate plain English market briefings via Ollama
+- **Geographic filtering**: Target specific counties for focused analysis
 - **Performance optimized**: Materialized views and strategic indexes for fast queries
 - **Rich visualizations**: Time series analysis, geographic heatmaps, market statistics
 - **Data quality**: Validates transactions, handles edge cases, structured logging
@@ -55,18 +58,22 @@ Edit `.env` with your settings:
 POSTGRES_PASSWORD=your_secure_password_here
 GRAFANA_ADMIN_PASSWORD=admin_password_here
 
-# Target areas (comma-separated, uppercase)
+# Target areas for AI summaries (comma-separated, uppercase)
 TARGET_COUNTIES=ESSEX,HERTFORDSHIRE,KENT,SURREY,CAMBRIDGESHIRE
+
+# AI service configuration (optional)
+OLLAMA_HOST=http://192.168.10.11:11434
+OLLAMA_MODEL=qwen2.5:1.5b
 ```
 
 ### 4. Start Services
 
 ```bash
-# Start database and Grafana
-docker-compose up -d postgres grafana
+# Start all services (database, API, Grafana)
+docker-compose up -d
 
 # Wait for services to initialize (30-60 seconds)
-docker-compose logs -f postgres
+docker-compose logs -f
 
 # Verify services are healthy
 docker-compose ps
@@ -76,48 +83,98 @@ docker-compose ps
 
 ```bash
 # Full historical dataset (takes 30-60 minutes)
-docker-compose run --rm ingest python ingest.py --mode full
+curl -X POST http://localhost:8001/api/ingest/yearly?year=2023
 
-# OR start with a single year for testing
-docker-compose run --rm ingest python ingest.py --mode yearly --year 2023
+# Check ingestion status
+curl http://localhost:8001/api/ingest/yearly_2023/status
+
+# Or load multiple years
+for year in 2022 2023 2024; do
+  curl -X POST "http://localhost:8001/api/ingest/yearly?year=$year"
+done
 ```
 
-### 6. Access Dashboard
+### 6. Access Services
 
-Open Grafana at `http://localhost:3000`
+**Grafana Dashboard**: `http://localhost:3001`
 - Username: `admin`
 - Password: (from your `.env` file)
 
-The PostgreSQL datasource will be automatically configured.
+**API Documentation**: `http://localhost:8001/api/docs`
+- Interactive API explorer
+- Test endpoints directly
+
+**Health Check**: `http://localhost:8001/api/health`
 
 ## Usage
 
-### Ingestion Modes
+### API Endpoints
 
 ```bash
-# Full dataset (1995-present) - run once for baseline
-docker-compose run --rm ingest python ingest.py --mode full
+# Monthly updates (run monthly after 20th working day)
+curl -X POST http://localhost:8001/api/ingest/monthly
 
-# Specific year - useful for backfilling or testing
-docker-compose run --rm ingest python ingest.py --mode yearly --year 2024
+# Yearly data ingestion
+curl -X POST "http://localhost:8001/api/ingest/yearly?year=2024"
 
-# Monthly updates - run on 21st of each month
-docker-compose run --rm ingest python ingest.py --mode monthly
+# Check job status
+curl http://localhost:8001/api/ingest/monthly/status
+curl http://localhost:8001/api/ingest/yearly_2024/status
 
-# Check what's available
-docker-compose run --rm ingest python ingest.py --help
+# Generate AI summary of recent market data
+curl -X POST http://localhost:8001/api/summarise/monthly
+
+# Health check
+curl http://localhost:8001/api/health
 ```
+
+### AI Market Summaries
+
+Generate plain English briefings suitable for push notifications:
+
+```bash
+# Get AI-powered market summary
+curl -X POST http://localhost:8001/api/summarise/monthly
+
+# Example response:
+{
+  "summary": "Essex led with 1,247 transactions at a £425,000 median (+2.1% month-over-month). Kent followed with 1,156 sales at £380,000 (+1.8% MoM). Hertfordshire showed 987 transactions at £520,000 (+0.9% MoM). Surrey recorded 856 sales at £615,000 (+1.2% MoM). Market activity increased across all monitored counties."
+}
+```
+
+### Automation
+
+Schedule monthly updates with cron:
+
+```bash
+# Add to crontab (crontab -e)
+# Run monthly update on 21st at 6 AM
+0 6 21 * * curl -X POST http://localhost:8001/api/ingest/monthly
+
+# Generate and send AI summary after ingestion
+30 6 21 * * curl -X POST http://localhost:8001/api/summarise/monthly | jq -r '.summary' | your-notification-system
+```
+
+Or use n8n for more complex workflows:
+- HTTP Request: `POST http://house_prices_api:8000/ingest/monthly`
+- Wait for completion: Poll `/ingest/monthly/status` until complete
+- HTTP Request: `POST http://house_prices_api:8000/summarise/monthly` 
+- Send notification with summary text
 
 ### Monitoring
 
 ```bash
-# Check ingestion logs
-docker-compose logs ingest
+# Check API service logs
+docker-compose logs api
+
+# Monitor running jobs
+curl http://localhost:8001/api/ingest/monthly/status
 
 # Database status
 docker-compose exec postgres psql -U prices -d house_prices -c "SELECT * FROM get_data_freshness();"
 
 # Service health
+curl http://localhost:8001/api/health
 docker-compose ps
 ```
 
@@ -139,19 +196,21 @@ docker-compose up -d
 
 ### Geographic Targeting
 
-Edit `TARGET_COUNTIES` in `.env` to change which areas are ingested:
+Edit `TARGET_COUNTIES` in `.env` to focus AI summaries on specific areas:
 
 ```bash
-# Example: Focus on London commuter belt
+# Example: Focus on London commuter belt  
 TARGET_COUNTIES=HERTFORDSHIRE,ESSEX,KENT,SURREY
 
 # Example: Expand to wider South East
 TARGET_COUNTIES=HERTFORDSHIRE,ESSEX,KENT,SURREY,BUCKINGHAMSHIRE,BERKSHIRE,OXFORDSHIRE
 ```
 
-Re-run yearly ingests for new counties:
+**Note**: All data is still ingested for the full dataset. `TARGET_COUNTIES` only affects AI summary generation, allowing you to focus notifications on areas of interest while maintaining complete historical data.
+
+Restart the API service after changing counties:
 ```bash
-docker-compose run --rm ingest python ingest.py --mode yearly --year 2023
+docker-compose restart api
 ```
 
 ### Data Volume Sizing
@@ -228,11 +287,17 @@ docker-compose logs postgres grafana
 cat .env
 
 # Check port conflicts
-ss -tlpn | grep -E ":3000|:5432"
+ss -tlpn | grep -E ":3001|:8001|:5432"
 ```
 
-**Ingestion fails**
+**API/Ingestion fails**
 ```bash
+# Check API service logs
+docker-compose logs api
+
+# Test API health
+curl http://localhost:8001/api/health
+
 # Check database connectivity
 docker-compose exec postgres psql -U prices -d house_prices -c "\dt"
 
