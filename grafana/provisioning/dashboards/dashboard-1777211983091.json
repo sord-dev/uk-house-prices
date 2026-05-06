@@ -63,7 +63,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "dfk662ru90ykge"
+                        "name": "default"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -213,7 +213,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "dfk662ru90ykge"
+                        "name": "default"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -312,7 +312,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "dfk662ru90ykge"
+                        "name": "default"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -440,7 +440,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "dfk662ru90ykge"
+                        "name": "default"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -589,7 +589,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "dfk662ru90ykge"
+                        "name": "default"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -875,7 +875,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "dfk662ru90ykge"
+              "name": "default"
             },
             "spec": {
               "dataset": "house_prices",
@@ -934,7 +934,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "dfk662ru90ykge"
+              "name": "default"
             },
             "spec": {
               "dataset": "house_prices",
@@ -993,7 +993,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "dfk662ru90ykge"
+              "name": "default"
             },
             "spec": {
               "dataset": "house_prices",
@@ -1052,7 +1052,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "dfk662ru90ykge"
+              "name": "default"
             },
             "spec": {
               "dataset": "house_prices",
@@ -1111,7 +1111,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "dfk662ru90ykge"
+              "name": "default"
             },
             "spec": {
               "dataset": "house_prices",
