@@ -1,0 +1,1141 @@
+{
+  "annotations": [
+    {
+      "kind": "AnnotationQuery",
+      "spec": {
+        "builtIn": true,
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "query": {
+          "datasource": {
+            "name": "-- Grafana --"
+          },
+          "group": "grafana",
+          "kind": "DataQuery",
+          "spec": {},
+          "version": "v0"
+        }
+      }
+    }
+  ],
+  "cursorSync": "Off",
+  "editable": true,
+  "elements": {
+    "panel-1": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfk662ru90ykge"
+                    },
+                    "group": "grafana-postgresql-datasource",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "dataset": "house_prices",
+                      "editorMode": "code",
+                      "format": "table",
+                      "rawQuery": true,
+                      "rawSql": "SELECT\n    DATE_TRUNC('year', date) AS time,\n    county,\n    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) AS median_price\nFROM transactions\nWHERE ppd_type = 'A'\n  AND record_status = 'A'\n  AND price > 0\n  AND county != 'GREATER LONDON'\n  AND county IS NOT NULL\n  AND county IN ($county)\n  AND tenure IN ($tenure)\n  AND property_type IN ($property_type)\n  AND new_build IN ($new_build)\nGROUP BY DATE_TRUNC('year', date), county\nORDER BY time, county;",
+                      "sql": {
+                        "columns": [
+                          {
+                            "parameters": [],
+                            "type": "function"
+                          }
+                        ],
+                        "groupBy": [
+                          {
+                            "property": {
+                              "type": "string"
+                            },
+                            "type": "groupBy"
+                          }
+                        ],
+                        "limit": 50
+                      }
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": [
+              {
+                "group": "partitionByValues",
+                "kind": "Transformation",
+                "spec": {
+                  "options": {
+                    "fields": [
+                      "county"
+                    ],
+                    "keepFields": false
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "",
+        "id": 1,
+        "links": [],
+        "title": "Median Price over Time",
+        "vizConfig": {
+          "group": "timeseries",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 0,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "linear",
+                  "lineWidth": 1,
+                  "pointSize": 5,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "showValues": false,
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "annotations": {
+                "clustering": -1,
+                "multiLane": false
+              },
+              "legend": {
+                "calcs": [],
+                "displayMode": "table",
+                "limit": 10,
+                "placement": "right",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              }
+            }
+          },
+          "version": "13.0.1"
+        }
+      }
+    },
+    "panel-2": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfk662ru90ykge"
+                    },
+                    "group": "grafana-postgresql-datasource",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "dataset": "house_prices",
+                      "editorMode": "code",
+                      "format": "table",
+                      "rawQuery": true,
+                      "rawSql": "SELECT\n    district,\n    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) AS median_price,\n    ROUND(CAST(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) AS numeric) / 39478, 1) AS salary_multiple\nFROM transactions\nWHERE ppd_type = 'A'\n  AND record_status = 'A'\n  AND price > 0\n  AND county != 'GREATER LONDON'\n  AND county IN ($county)\n  AND district IS NOT NULL \n  AND tenure IN ($tenure)\n  AND property_type IN ($property_type)\n  AND new_build IN ($new_build)\n  AND date >= NOW() - INTERVAL '2 years'\nGROUP BY district\nHAVING COUNT(*) > 50\nORDER BY salary_multiple ASC;",
+                      "sql": {
+                        "columns": [
+                          {
+                            "parameters": [],
+                            "type": "function"
+                          }
+                        ],
+                        "groupBy": [
+                          {
+                            "property": {
+                              "type": "string"
+                            },
+                            "type": "groupBy"
+                          }
+                        ],
+                        "limit": 50
+                      }
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "",
+        "id": 2,
+        "links": [],
+        "title": "Affordability by District (Salary Multiple)",
+        "vizConfig": {
+          "group": "table",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "auto",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "footer": {
+                    "reducers": []
+                  },
+                  "inspect": false
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "cellHeight": "sm",
+              "showHeader": true
+            }
+          },
+          "version": "13.0.1"
+        }
+      }
+    },
+    "panel-3": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfk662ru90ykge"
+                    },
+                    "group": "grafana-postgresql-datasource",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "dataset": "house_prices",
+                      "editorMode": "code",
+                      "format": "table",
+                      "rawQuery": true,
+                      "rawSql": "SELECT\n    district,\n    ROUND(CAST(100.0 * (current_median - prev_median) / prev_median AS numeric), 1) AS yoy_change_pct\nFROM (\n    SELECT\n        district,\n        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) \n            FILTER (WHERE date >= '2025-01-01') AS current_median,\n        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) \n            FILTER (WHERE date BETWEEN '2024-01-01' AND '2025-01-01') AS prev_median\n    FROM transactions\n    WHERE ppd_type = 'A'\n      AND record_status = 'A'\n      AND county IN ($county)\n      AND tenure IN ($tenure)\n      AND property_type IN ($property_type)\n      AND new_build IN ($new_build)\n    GROUP BY district\n    HAVING COUNT(*) > 20\n) sub\nWHERE prev_median IS NOT NULL \n  AND current_median IS NOT NULL\nORDER BY yoy_change_pct DESC;",
+                      "sql": {
+                        "columns": [
+                          {
+                            "parameters": [],
+                            "type": "function"
+                          }
+                        ],
+                        "groupBy": [
+                          {
+                            "property": {
+                              "type": "string"
+                            },
+                            "type": "groupBy"
+                          }
+                        ],
+                        "limit": 50
+                      }
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "",
+        "id": 3,
+        "links": [],
+        "title": "YoY Price Change %",
+        "vizConfig": {
+          "group": "barchart",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "fillOpacity": 80,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "lineWidth": 3,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "barRadius": 0,
+              "barWidth": 0.56,
+              "fullHighlight": false,
+              "groupWidth": 0.7,
+              "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "right",
+                "showLegend": false
+              },
+              "orientation": "horizontal",
+              "showValue": "never",
+              "stacking": "none",
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              },
+              "xTickLabelRotation": 0,
+              "xTickLabelSpacing": 0
+            }
+          },
+          "version": "13.0.1"
+        }
+      }
+    },
+    "panel-4": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfk662ru90ykge"
+                    },
+                    "group": "grafana-postgresql-datasource",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "dataset": "house_prices",
+                      "editorMode": "code",
+                      "format": "table",
+                      "rawQuery": true,
+                      "rawSql": "SELECT\n    DATE_TRUNC('year', date) AS time,\n    district,\n    COUNT(*) AS transaction_count\nFROM transactions\nWHERE ppd_type = 'A'\n  AND record_status = 'A'\n  AND county != 'GREATER LONDON'\n  AND county IN ($county)\n  AND district IN ($district)\n  AND tenure IN ($tenure)\n  AND property_type IN ($property_type)\n  AND new_build IN ($new_build)\nGROUP BY DATE_TRUNC('year', date), district\nORDER BY time, district;",
+                      "sql": {
+                        "columns": [
+                          {
+                            "parameters": [],
+                            "type": "function"
+                          }
+                        ],
+                        "groupBy": [
+                          {
+                            "property": {
+                              "type": "string"
+                            },
+                            "type": "groupBy"
+                          }
+                        ],
+                        "limit": 50
+                      }
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": [
+              {
+                "group": "partitionByValues",
+                "kind": "Transformation",
+                "spec": {
+                  "options": {
+                    "fields": [
+                      "district"
+                    ],
+                    "keepFields": false
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "",
+        "id": 4,
+        "links": [],
+        "title": "Transaction Volume Over TIme",
+        "vizConfig": {
+          "group": "timeseries",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 25,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "linear",
+                  "lineWidth": 1,
+                  "pointSize": 5,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "showValues": false,
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "normal"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "annotations": {
+                "clustering": -1,
+                "multiLane": false
+              },
+              "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              }
+            }
+          },
+          "version": "13.0.1"
+        }
+      }
+    },
+    "panel-5": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfk662ru90ykge"
+                    },
+                    "group": "grafana-postgresql-datasource",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "dataset": "house_prices",
+                      "editorMode": "code",
+                      "format": "table",
+                      "rawQuery": true,
+                      "rawSql": "SELECT\n    p.lat,\n    p.lng,\n    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.price) AS median_price,\n    t.postcode\nFROM transactions t\nJOIN postcodes p ON t.postcode = p.postcode\nWHERE t.ppd_type = 'A'\n  AND t.record_status = 'A'\n  AND t.price > 0\n  AND t.county != 'GREATER LONDON'\n  AND t.district IN ($district)\n  AND t.tenure IN ($tenure)\n  AND t.new_build IN ($new_build)\n  AND t.property_type IN ($property_type)\n  AND t.date >= NOW() - INTERVAL '2 years'\nGROUP BY p.lat, p.lng, t.postcode\nHAVING COUNT(*) > 3;",
+                      "sql": {
+                        "columns": [
+                          {
+                            "parameters": [],
+                            "type": "function"
+                          }
+                        ],
+                        "groupBy": [
+                          {
+                            "property": {
+                              "type": "string"
+                            },
+                            "type": "groupBy"
+                          }
+                        ],
+                        "limit": 50
+                      }
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "",
+        "id": 5,
+        "links": [],
+        "title": "Property Price Heatmap",
+        "vizConfig": {
+          "group": "geomap",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  }
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "#EAB839",
+                      "value": 250000
+                    },
+                    {
+                      "color": "semi-dark-red",
+                      "value": 350000
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "basemap": {
+                "config": {},
+                "name": "Layer 0",
+                "noRepeat": false,
+                "type": "default"
+              },
+              "controls": {
+                "mouseWheelZoom": true,
+                "showAttribution": true,
+                "showDebug": false,
+                "showMeasure": false,
+                "showScale": false,
+                "showZoom": true
+              },
+              "layers": [
+                {
+                  "config": {
+                    "showLegend": true,
+                    "style": {
+                      "color": {
+                        "field": "median_price",
+                        "fixed": "dark-green"
+                      },
+                      "opacity": 0.4,
+                      "rotation": {
+                        "fixed": 0,
+                        "max": 360,
+                        "min": -360,
+                        "mode": "mod"
+                      },
+                      "size": {
+                        "field": "median_price",
+                        "fixed": 5,
+                        "max": 15,
+                        "min": 2
+                      },
+                      "symbol": {
+                        "fixed": "img/icons/marker/circle.svg",
+                        "mode": "fixed"
+                      },
+                      "symbolAlign": {
+                        "horizontal": "center",
+                        "vertical": "center"
+                      },
+                      "text": {
+                        "field": "median_price",
+                        "fixed": "",
+                        "mode": "field"
+                      },
+                      "textConfig": {
+                        "fontSize": 12,
+                        "offsetX": 0,
+                        "offsetY": 0,
+                        "textAlign": "center",
+                        "textBaseline": "middle"
+                      }
+                    }
+                  },
+                  "filterData": {
+                    "id": "byRefId",
+                    "options": "A"
+                  },
+                  "layer-tooltip": false,
+                  "location": {
+                    "mode": "auto"
+                  },
+                  "name": "median-house-prices",
+                  "tooltip": true,
+                  "type": "markers"
+                }
+              ],
+              "tooltip": {
+                "mode": "details"
+              },
+              "view": {
+                "allLayers": true,
+                "dashboardVariable": false,
+                "id": "fit",
+                "lastOnly": false,
+                "lat": 0,
+                "layer": "Layer 1",
+                "lon": 0,
+                "noRepeat": false,
+                "zoom": 15
+              }
+            }
+          },
+          "version": "13.0.1"
+        }
+      }
+    }
+  },
+  "layout": {
+    "kind": "GridLayout",
+    "spec": {
+      "items": [
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "panel-5"
+            },
+            "height": 13,
+            "width": 24,
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "panel-3"
+            },
+            "height": 15,
+            "width": 10,
+            "x": 0,
+            "y": 13
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "panel-1"
+            },
+            "height": 15,
+            "width": 14,
+            "x": 10,
+            "y": 13
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "panel-2"
+            },
+            "height": 8,
+            "width": 10,
+            "x": 0,
+            "y": 28
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "panel-4"
+            },
+            "height": 8,
+            "width": 14,
+            "x": 10,
+            "y": 28
+          }
+        }
+      ]
+    }
+  },
+  "links": [],
+  "liveNow": false,
+  "preferences": {
+    "layout": {
+      "kind": "GridLayout",
+      "spec": {
+        "items": []
+      }
+    }
+  },
+  "preload": false,
+  "tags": [],
+  "timeSettings": {
+    "autoRefresh": "",
+    "autoRefreshIntervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "fiscalYearStartMonth": 0,
+    "from": "1995-01-01T00:00:00.000Z",
+    "hideTimepicker": false,
+    "timezone": "browser",
+    "to": "2026-01-01T00:00:00.000Z"
+  },
+  "title": "Outside M25",
+  "variables": [
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allowCustomValue": true,
+        "current": {
+          "text": [
+            "KENT",
+            "ESSEX",
+            "MEDWAY",
+            "HERTFORDSHIRE"
+          ],
+          "value": [
+            "KENT",
+            "ESSEX",
+            "MEDWAY",
+            "HERTFORDSHIRE"
+          ]
+        },
+        "definition": "SELECT DISTINCT county FROM transactions WHERE county != 'GREATER LONDON' AND county IS NOT NULL ORDER BY county",
+        "hide": "dontHide",
+        "includeAll": true,
+        "multi": true,
+        "name": "county",
+        "options": [],
+        "query": {
+          "datasource": {
+            "name": "dfk662ru90ykge"
+          },
+          "group": "grafana-postgresql-datasource",
+          "kind": "DataQuery",
+          "spec": {
+            "dataset": "house_prices",
+            "editorMode": "code",
+            "format": "table",
+            "query": "SELECT DISTINCT county FROM transactions WHERE county != 'GREATER LONDON' AND county IS NOT NULL ORDER BY county",
+            "rawQuery": true,
+            "rawSql": "SELECT DISTINCT county FROM transactions WHERE county != 'GREATER LONDON' AND county IS NOT NULL ORDER BY county",
+            "refId": "SQLVariableQueryEditor-VariableQuery",
+            "sql": {
+              "columns": [
+                {
+                  "parameters": [],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            }
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "disabled"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allowCustomValue": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "definition": "SELECT DISTINCT district FROM transactions WHERE county != 'GREATER LONDON' AND district IS NOT NULL ORDER BY district",
+        "hide": "dontHide",
+        "includeAll": true,
+        "multi": true,
+        "name": "district",
+        "options": [],
+        "query": {
+          "datasource": {
+            "name": "dfk662ru90ykge"
+          },
+          "group": "grafana-postgresql-datasource",
+          "kind": "DataQuery",
+          "spec": {
+            "dataset": "house_prices",
+            "editorMode": "code",
+            "format": "table",
+            "query": "SELECT DISTINCT district FROM transactions WHERE county != 'GREATER LONDON' AND district IS NOT NULL ORDER BY district",
+            "rawQuery": true,
+            "rawSql": "SELECT DISTINCT district FROM transactions WHERE county != 'GREATER LONDON' AND district IS NOT NULL ORDER BY district",
+            "refId": "SQLVariableQueryEditor-VariableQuery",
+            "sql": {
+              "columns": [
+                {
+                  "parameters": [],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            }
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "disabled"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allowCustomValue": true,
+        "current": {
+          "text": [
+            "F"
+          ],
+          "value": [
+            "F"
+          ]
+        },
+        "definition": "SELECT DISTINCT tenure FROM transactions WHERE tenure IS NOT NULL ORDER BY tenure",
+        "hide": "dontHide",
+        "includeAll": true,
+        "multi": true,
+        "name": "tenure",
+        "options": [],
+        "query": {
+          "datasource": {
+            "name": "dfk662ru90ykge"
+          },
+          "group": "grafana-postgresql-datasource",
+          "kind": "DataQuery",
+          "spec": {
+            "dataset": "house_prices",
+            "editorMode": "code",
+            "format": "table",
+            "query": "SELECT DISTINCT tenure FROM transactions WHERE tenure IS NOT NULL ORDER BY tenure",
+            "rawQuery": true,
+            "rawSql": "SELECT DISTINCT tenure FROM transactions WHERE tenure IS NOT NULL ORDER BY tenure",
+            "refId": "SQLVariableQueryEditor-VariableQuery",
+            "sql": {
+              "columns": [
+                {
+                  "parameters": [],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            }
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "disabled"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allowCustomValue": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "definition": "SELECT DISTINCT property_type FROM transactions WHERE property_type IS NOT NULL ORDER BY property_type",
+        "hide": "dontHide",
+        "includeAll": true,
+        "multi": true,
+        "name": "property_type",
+        "options": [],
+        "query": {
+          "datasource": {
+            "name": "dfk662ru90ykge"
+          },
+          "group": "grafana-postgresql-datasource",
+          "kind": "DataQuery",
+          "spec": {
+            "dataset": "house_prices",
+            "editorMode": "code",
+            "format": "table",
+            "query": "SELECT DISTINCT property_type FROM transactions WHERE property_type IS NOT NULL ORDER BY property_type",
+            "rawQuery": true,
+            "rawSql": "SELECT DISTINCT property_type FROM transactions WHERE property_type IS NOT NULL ORDER BY property_type",
+            "refId": "SQLVariableQueryEditor-VariableQuery",
+            "sql": {
+              "columns": [
+                {
+                  "parameters": [],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            }
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "disabled"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allowCustomValue": true,
+        "current": {
+          "text": [
+            "N"
+          ],
+          "value": [
+            "N"
+          ]
+        },
+        "definition": "SELECT DISTINCT new_build FROM transactions WHERE new_build IS NOT NULL ORDER BY new_build",
+        "hide": "dontHide",
+        "includeAll": true,
+        "multi": true,
+        "name": "new_build",
+        "options": [],
+        "query": {
+          "datasource": {
+            "name": "dfk662ru90ykge"
+          },
+          "group": "grafana-postgresql-datasource",
+          "kind": "DataQuery",
+          "spec": {
+            "dataset": "house_prices",
+            "editorMode": "code",
+            "format": "table",
+            "query": "SELECT DISTINCT new_build FROM transactions WHERE new_build IS NOT NULL ORDER BY new_build",
+            "rawQuery": true,
+            "rawSql": "SELECT DISTINCT new_build FROM transactions WHERE new_build IS NOT NULL ORDER BY new_build",
+            "refId": "SQLVariableQueryEditor-VariableQuery",
+            "sql": {
+              "columns": [
+                {
+                  "parameters": [],
+                  "type": "function"
+                }
+              ],
+              "groupBy": [
+                {
+                  "property": {
+                    "type": "string"
+                  },
+                  "type": "groupBy"
+                }
+              ],
+              "limit": 50
+            }
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "disabled"
+      }
+    }
+  ]
+}

@@ -28,8 +28,11 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_INSTALL_PLUGINS: ""
-      GF_SERVER_ROOT_URL: "https://prices.picxi.uk"
-      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_ROOT_URL: "https://prices.picxi.uk/grafana"
+      POSTGRES_DB: ${POSTGRES_DB:-house_prices}
+      POSTGRES_USER: ${POSTGRES_USER:-prices}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./grafana:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -37,6 +40,7 @@ services:
       - "3001:3000"
     networks:
       - house_prices_net
+      - picxibox_net
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,6 +91,36 @@ services:
       profiles:
         - postcode
 
+  api:
+    build:
+      context: ./ingest
+      dockerfile: Dockerfile
+    container_name: house_prices_api
+    restart: unless-stopped
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --app-dir /
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-house_prices}
+      POSTGRES_USER: ${POSTGRES_USER:-prices}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TARGET_COUNTIES: ${TARGET_COUNTIES}
+    volumes:
+      - ./logs:/app/logs
+      - ./api:/api  # mounts api/main.py
+    ports:
+      - "8001:8000"
+    networks:
+      - house_prices_net
+      - picxibox_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 networks:
   house_prices_net:
     driver: bridge
+  picxibox_net:
+    external: true
