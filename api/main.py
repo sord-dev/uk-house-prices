@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -12,6 +13,10 @@ from fastapi.responses import JSONResponse
 
 sys.path.insert(0, "/app")
 from ingest import LandRegistryIngestor
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 jobs: dict = {}
 
@@ -120,7 +125,7 @@ async def get_monthly_summary_data() -> List[Dict]:
         async with conn.cursor(row_factory=dict_row) as cursor:
             await cursor.execute(debug_query)
             debug_results = await cursor.fetchall()
-            print(f"DEBUG - Recent months data: {[dict(row) for row in debug_results]}")
+            logger.info(f"DEBUG - Recent months data: {[dict(row) for row in debug_results]}")
         
         query = f"""
         WITH monthly_ranges AS (
@@ -200,11 +205,11 @@ async def get_monthly_summary_data() -> List[Dict]:
             
         await conn.close()
         result_data = [dict(row) for row in results]
-        print(f"DEBUG - Query results: {result_data[:3]}")  # Show first 3 results
+        logger.info(f"DEBUG - Query results: {result_data[:3]}")  # Show first 3 results
         return result_data
         
     except Exception as e:
-        print(f"DEBUG - Database error: {e}")
+        logger.error(f"DEBUG - Database error: {e}")
         raise HTTPException(500, f"Database query failed: {e}")
 
 
@@ -213,20 +218,28 @@ async def generate_ai_summary(data: List[Dict]) -> str:
     if not data:
         raise HTTPException(503, "No data available for summary")
     
-    # Format data for the prompt
+    # Format data for the prompt with explicit details
     formatted_data = ""
     for row in data:
         area_name = row['area_name'] or 'Unknown'
         area_type = row['area_type'] or 'Area'
         transactions = int(row['transactions'])
         median_price = int(row['median_price']) if row['median_price'] else 0
-        mom_change = float(row['mom_change_pct']) if row['mom_change_pct'] is not None else 0
+        current_median = int(row['current_median']) if row['current_median'] else None
+        previous_median = int(row['previous_median']) if row['previous_median'] else None
+        mom_change = float(row['mom_change_pct']) if row['mom_change_pct'] is not None else None
         
-        formatted_data += f"\n{area_name} ({area_type}): {transactions:,} transactions, median £{median_price:,}, {mom_change:+.1f}% MoM change"
+        change_str = f"{mom_change:+.1f}%" if mom_change is not None else "no data"
+        current_str = f"£{current_median:,}" if current_median else "no current data"
+        previous_str = f"£{previous_median:,}" if previous_median else "no previous data"
+        
+        formatted_data += f"\n{area_name} ({area_type}): {transactions:,} total transactions over 2 months, overall median £{median_price:,}, current month median {current_str}, previous month median {previous_str}, month-over-month change {change_str}"
     
-    prompt = f"""You are a UK property market analyst. Given the following monthly data, write a 3-5 sentence plain english briefing suitable for a push notification. Be specific with numbers. Do not speculate beyond the data.
+    logger.info(f"DEBUG - Formatted data for AI: {formatted_data[:500]}...")  # Log first 500 chars
+    
+    prompt = f"""You are a UK property market analyst. Given the following monthly property market data for May 2026, write a 3-5 sentence plain english briefing suitable for a push notification. Be specific with the actual numbers provided. Focus on the month-over-month changes and current median prices. Do not speculate beyond the data provided.
 
-Data:{formatted_data}"""
+Property Market Data for May 2026:{formatted_data}"""
     
     payload = {
         "model": OLLAMA_MODEL,
