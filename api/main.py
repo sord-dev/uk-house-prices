@@ -113,7 +113,8 @@ async def get_monthly_summary_data() -> List[Dict]:
             SELECT
                 county as area_name,
                 'County' as area_type,
-                COUNT(*) as transactions,
+                COUNT(*) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                    AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as transactions,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
                     FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as current_month_median,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
@@ -136,7 +137,8 @@ async def get_monthly_summary_data() -> List[Dict]:
             SELECT
                 district as area_name,
                 'London Borough' as area_type,
-                COUNT(*) as transactions,
+                COUNT(*) FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+                    AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as transactions,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
                     FILTER (WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month') as current_month_median,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)
@@ -204,7 +206,7 @@ def _select_notable(data: List[Dict]) -> Dict:
     top_gainers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']), reverse=True)[:3]
     top_fallers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']))[:3]
     top_yoy_gainers = sorted(with_yoy, key=lambda r: float(r['yoy_change_pct']), reverse=True)[:3]
-    top_yoy_fallers = sorted(with_yoy, key=lambda r: float(r['yoy_change_pct']))[:3]
+    top_yoy_fallers = sorted([r for r in with_yoy if float(r['yoy_change_pct']) < 0], key=lambda r: float(r['yoy_change_pct']))[:3]
     return {
         "reporting_month": reporting_month,
         "total_tx": total_tx,
