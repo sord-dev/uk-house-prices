@@ -94,7 +94,7 @@ async def job_status(job_id: str):
     return jobs[job_id]
 
 
-async def get_monthly_summary_data() -> List[Dict]:
+async def get_monthly_summary_data():
     """Query PostgreSQL for recent monthly house price data."""
     try:
         conn = await psycopg.AsyncConnection.connect(**DB_CONFIG)
@@ -172,13 +172,27 @@ async def get_monthly_summary_data() -> List[Dict]:
         ORDER BY transactions DESC;
         """
         
+        date_range_query = """
+        SELECT
+            to_char(MIN(date), 'YYYY-MM-DD') as min_date,
+            to_char(MAX(date), 'YYYY-MM-DD') as max_date
+        FROM transactions
+        WHERE ppd_type = 'A'
+          AND record_status = 'A'
+          AND date >= date_trunc('month', CURRENT_DATE) - INTERVAL '2 months'
+          AND date < date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+        """
+
         async with conn.cursor(row_factory=dict_row) as cursor:
             await cursor.execute(query)
             results = await cursor.fetchall()
-            
+            await cursor.execute(date_range_query)
+            dr = await cursor.fetchone()
+
         await conn.close()
-        return [dict(row) for row in results]
-        
+        date_range = {"from": dr['min_date'], "to": dr['max_date']} if dr and dr['min_date'] else None
+        return [dict(row) for row in results], date_range
+
     except Exception as e:
         raise HTTPException(500, f"Database query failed: {e}")
 
@@ -341,7 +355,7 @@ Markets by volume:
 async def summarise_monthly():
     """Generate AI summary of recent monthly house price data."""
     try:
-        data = await get_monthly_summary_data()
+        data, date_range = await get_monthly_summary_data()
         if not data:
             raise HTTPException(503, "No data available for summary")
         notable = _select_notable(data)
@@ -352,6 +366,7 @@ async def summarise_monthly():
         result = {
             "summary": summary,
             "data_period": notable["reporting_month"],
+            "actual_date_range": date_range,
             "areas_analysed": len(data),
             "data": {
                 "top_by_volume": [_serialise_area(r) for r in notable["top_by_volume"]],
