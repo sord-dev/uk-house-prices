@@ -180,7 +180,7 @@ async def get_monthly_summary_data() -> List[Dict]:
 
 
 def _format_row(row: Dict) -> str:
-    area = row['area_name'] or 'Unknown'
+    area = (row['area_name'] or 'Unknown').title()
     area_type = row['area_type'] or 'Area'
     tx = int(row['transactions'])
     median = row['current_month_median']
@@ -193,20 +193,42 @@ def _format_row(row: Dict) -> str:
     return parts[0]
 
 
-async def generate_ai_summary(data: List[Dict]) -> str:
-    """Send pre-selected notable data to Ollama for AI summary generation."""
-    if not data:
-        raise HTTPException(503, "No data available for summary")
-
+def _select_notable(data: List[Dict]) -> Dict:
     reporting_month = data[0].get('reporting_month') or 'Unknown'
     total_tx = sum(int(r['transactions']) for r in data)
-
     with_mom = [r for r in data if r['mom_change_pct'] is not None and r['current_month_median']]
-
-    # Show all areas if small dataset, otherwise top 10
     top_by_volume = data if len(data) <= 15 else data[:10]
     top_gainers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']), reverse=True)[:3]
     top_fallers = sorted(with_mom, key=lambda r: float(r['mom_change_pct']))[:3]
+    return {
+        "reporting_month": reporting_month,
+        "total_tx": total_tx,
+        "with_mom": with_mom,
+        "top_by_volume": top_by_volume,
+        "top_gainers": top_gainers,
+        "top_fallers": top_fallers,
+    }
+
+
+def _serialise_area(row: Dict) -> Dict:
+    return {
+        "area_name": (row['area_name'] or 'Unknown').title(),
+        "area_type": row['area_type'] or 'Area',
+        "transactions": int(row['transactions']),
+        "current_month_median": int(row['current_month_median']) if row['current_month_median'] else None,
+        "prev_month_median": int(row['prev_month_median']) if row['prev_month_median'] else None,
+        "mom_change_pct": float(row['mom_change_pct']) if row['mom_change_pct'] is not None else None,
+    }
+
+
+async def generate_ai_summary(notable: Dict) -> str:
+    """Send pre-selected notable data to Ollama for AI summary generation."""
+    reporting_month = notable['reporting_month']
+    total_tx = notable['total_tx']
+    with_mom = notable['with_mom']
+    top_by_volume = notable['top_by_volume']
+    top_gainers = notable['top_gainers']
+    top_fallers = notable['top_fallers']
 
     def section(rows: List[Dict]) -> str:
         return "\n".join(f"  {_format_row(r)}" for r in rows)
@@ -243,7 +265,7 @@ What each sentence must cover:
 Data:
 Reporting period: {reporting_month}
 Total transactions: {total_tx:,}
-Areas monitored: {len(data)}
+Areas monitored: {len(top_by_volume)}
 
 Markets by volume:
 {section(top_by_volume)}
@@ -280,9 +302,20 @@ async def summarise_monthly():
     """Generate AI summary of recent monthly house price data."""
     try:
         data = await get_monthly_summary_data()
-        summary = await generate_ai_summary(data)
-        reporting_month = data[0].get('reporting_month') if data else None
-        return {"summary": summary, "data_period": reporting_month, "areas_analysed": len(data)}
+        if not data:
+            raise HTTPException(503, "No data available for summary")
+        notable = _select_notable(data)
+        summary = await generate_ai_summary(notable)
+        return {
+            "summary": summary,
+            "data_period": notable["reporting_month"],
+            "areas_analysed": len(data),
+            "data": {
+                "top_by_volume": [_serialise_area(r) for r in notable["top_by_volume"]],
+                "top_gainers": [_serialise_area(r) for r in notable["top_gainers"]],
+                "top_fallers": [_serialise_area(r) for r in notable["top_fallers"]],
+            },
+        }
     except HTTPException:
         raise
     except Exception as e:
