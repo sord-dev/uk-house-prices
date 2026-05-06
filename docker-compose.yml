@@ -111,7 +111,7 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
     volumes:
       - ./logs:/app/logs
-      - ./api:/api  # mounts api/main.py
+      - ./api:/api
     ports:
       - "8001:8000"
     networks:
