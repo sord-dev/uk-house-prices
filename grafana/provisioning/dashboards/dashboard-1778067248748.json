@@ -63,7 +63,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "default"
+                        "name": "house-prices-postgres"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -216,7 +216,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "default"
+                        "name": "house-prices-postgres"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -344,7 +344,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "default"
+                        "name": "house-prices-postgres"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -443,7 +443,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "default"
+                        "name": "house-prices-postgres"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -572,7 +572,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "default"
+                        "name": "house-prices-postgres"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -722,7 +722,7 @@
                       "group": "grafana-postgresql-datasource",
                       "version": "v0",
                       "datasource": {
-                        "name": "default"
+                        "name": "house-prices-postgres"
                       },
                       "spec": {
                         "dataset": "house_prices",
@@ -1011,7 +1011,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "default"
+              "name": "house-prices-postgres"
             },
             "spec": {
               "dataset": "house_prices",
@@ -1071,7 +1071,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "default"
+              "name": "house-prices-postgres"
             },
             "spec": {
               "dataset": "house_prices",
@@ -1131,7 +1131,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "default"
+              "name": "house-prices-postgres"
             },
             "spec": {
               "dataset": "house_prices",
@@ -1191,7 +1191,7 @@
             "group": "grafana-postgresql-datasource",
             "version": "v0",
             "datasource": {
-              "name": "default"
+              "name": "house-prices-postgres"
             },
             "spec": {
               "dataset": "house_prices",
@@ -1245,7 +1245,7 @@
           "label": "Annual Salary",
           "hide": "dontHide",
           "skipUrlSync": false,
-          "description": "\n\n40746 — London C min (current band floor)\n45334 — London C max (where you are now)\n47900 — London B min (post promotion floor)\n56941 — London B max (promotion ceiling)",
+          "description": "\n\n40746 \u2014 London C min (current band floor)\n45334 \u2014 London C max (where you are now)\n47900 \u2014 London B min (post promotion floor)\n56941 \u2014 London B max (promotion ceiling)",
           "allowCustomValue": true,
           "valuesFormat": "csv"
         }

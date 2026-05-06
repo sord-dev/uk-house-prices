@@ -3,6 +3,7 @@ apiVersion: 1
 datasources:
   - name: House Prices PostgreSQL
     type: postgres
+    uid: house-prices-postgres
     access: proxy
     url: postgres:5432
     database: ${POSTGRES_DB}
@@ -16,5 +17,7 @@ datasources:
       connMaxLifetime: 14400
       postgresVersion: 1600
       timescaledb: false
+      database: ${POSTGRES_DB}
+    orgId: 1
     editable: true
     isDefault: true
