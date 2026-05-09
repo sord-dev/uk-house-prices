@@ -24,20 +24,20 @@
       {
         "kind": "AnnotationQuery",
         "spec": {
-          "query": {
-            "kind": "DataQuery",
-            "group": "grafana",
-            "version": "v0",
-            "datasource": {
-              "name": "-- Grafana --"
-            },
-            "spec": {}
-          },
+          "builtIn": true,
           "enable": true,
           "hide": true,
           "iconColor": "rgba(0, 211, 255, 1)",
           "name": "Annotations & Alerts",
-          "builtIn": true
+          "query": {
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "group": "grafana",
+            "kind": "DataQuery",
+            "spec": {},
+            "version": "v0"
+          }
         }
       }
     ],
@@ -47,10 +47,6 @@
       "panel-1": {
         "kind": "Panel",
         "spec": {
-          "id": 1,
-          "title": "Median Price over Time",
-          "description": "",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -58,13 +54,13 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "grafana-postgresql-datasource",
-                      "version": "v0",
                       "datasource": {
                         "name": "house-prices-postgres"
                       },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
                       "spec": {
                         "dataset": "house_prices",
                         "editorMode": "code",
@@ -88,17 +84,18 @@
                           ],
                           "limit": 50
                         }
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
+              "queryOptions": {},
               "transformations": [
                 {
-                  "kind": "Transformation",
                   "group": "partitionByValues",
+                  "kind": "Transformation",
                   "spec": {
                     "options": {
                       "fields": [
@@ -108,48 +105,19 @@
                     }
                   }
                 }
-              ],
-              "queryOptions": {}
+              ]
             }
           },
+          "description": "",
+          "id": 1,
+          "links": [],
+          "title": "Median Price over Time",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "kind": "VizConfig",
             "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "table",
-                  "limit": 10,
-                  "placement": "right",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
-              },
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 80,
-                        "color": "red"
-                      }
-                    ]
-                  },
                   "color": {
                     "mode": "palette-classic"
                   },
@@ -186,21 +154,49 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
                   }
                 },
                 "overrides": []
+              },
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "table",
+                  "limit": 10,
+                  "placement": "right",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
               }
-            }
+            },
+            "version": "13.0.1"
           }
         }
       },
       "panel-2": {
         "kind": "Panel",
         "spec": {
-          "id": 2,
-          "title": "Affordability by District (Salary Multiple)",
-          "description": "",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -208,13 +204,13 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "grafana-postgresql-datasource",
-                      "version": "v0",
                       "datasource": {
                         "name": "house-prices-postgres"
                       },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
                       "spec": {
                         "dataset": "house_prices",
                         "editorMode": "code",
@@ -238,41 +234,27 @@
                           ],
                           "limit": 50
                         }
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "",
+          "id": 2,
+          "links": [],
+          "title": "Affordability by District (Salary Multiple)",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "table",
-            "version": "13.0.1",
+            "kind": "VizConfig",
             "spec": {
-              "options": {
-                "cellHeight": "sm",
-                "showHeader": true
-              },
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 80,
-                        "color": "red"
-                      }
-                    ]
-                  },
                   "color": {
                     "mode": "thresholds"
                   },
@@ -285,21 +267,35 @@
                       "reducers": []
                     },
                     "inspect": false
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
                   }
                 },
                 "overrides": []
+              },
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true
               }
-            }
+            },
+            "version": "13.0.1"
           }
         }
       },
       "panel-3": {
         "kind": "Panel",
         "spec": {
-          "id": 3,
-          "title": "YoY Price Change %",
-          "description": "",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -307,13 +303,13 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "grafana-postgresql-datasource",
-                      "version": "v0",
                       "datasource": {
                         "name": "house-prices-postgres"
                       },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
                       "spec": {
                         "dataset": "house_prices",
                         "editorMode": "code",
@@ -337,59 +333,27 @@
                           ],
                           "limit": 50
                         }
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "",
+          "id": 3,
+          "links": [],
+          "title": "YoY Price Change %",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "barchart",
-            "version": "13.0.1",
+            "kind": "VizConfig",
             "spec": {
-              "options": {
-                "barRadius": 0,
-                "barWidth": 0.56,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "right",
-                  "showLegend": false
-                },
-                "orientation": "horizontal",
-                "showValue": "never",
-                "stacking": "none",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                },
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
-              },
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 80,
-                        "color": "red"
-                      }
-                    ]
-                  },
                   "color": {
                     "mode": "palette-classic"
                   },
@@ -413,21 +377,53 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
                   }
                 },
                 "overrides": []
+              },
+              "options": {
+                "barRadius": 0,
+                "barWidth": 0.56,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "right",
+                  "showLegend": false
+                },
+                "orientation": "horizontal",
+                "showValue": "never",
+                "stacking": "none",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
               }
-            }
+            },
+            "version": "13.0.1"
           }
         }
       },
       "panel-4": {
         "kind": "Panel",
         "spec": {
-          "id": 4,
-          "title": "Transaction Volume Over TIme",
-          "description": "",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -435,13 +431,13 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "grafana-postgresql-datasource",
-                      "version": "v0",
                       "datasource": {
                         "name": "house-prices-postgres"
                       },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
                       "spec": {
                         "dataset": "house_prices",
                         "editorMode": "code",
@@ -465,17 +461,18 @@
                           ],
                           "limit": 50
                         }
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
+              "queryOptions": {},
               "transformations": [
                 {
-                  "kind": "Transformation",
                   "group": "partitionByValues",
+                  "kind": "Transformation",
                   "spec": {
                     "options": {
                       "fields": [
@@ -485,47 +482,19 @@
                     }
                   }
                 }
-              ],
-              "queryOptions": {}
+              ]
             }
           },
+          "description": "",
+          "id": 4,
+          "links": [],
+          "title": "Transaction Volume Over TIme",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "kind": "VizConfig",
             "spec": {
-              "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
-                },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
-              },
               "fieldConfig": {
                 "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 80,
-                        "color": "red"
-                      }
-                    ]
-                  },
                   "color": {
                     "mode": "palette-classic"
                   },
@@ -562,21 +531,48 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
                   }
                 },
                 "overrides": []
+              },
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
               }
-            }
+            },
+            "version": "13.0.1"
           }
         }
       },
       "panel-5": {
         "kind": "Panel",
         "spec": {
-          "id": 5,
-          "title": "Property Price Heatmap",
-          "description": "",
-          "links": [],
           "data": {
             "kind": "QueryGroup",
             "spec": {
@@ -584,19 +580,19 @@
                 {
                   "kind": "PanelQuery",
                   "spec": {
+                    "hidden": false,
                     "query": {
-                      "kind": "DataQuery",
-                      "group": "grafana-postgresql-datasource",
-                      "version": "v0",
                       "datasource": {
                         "name": "house-prices-postgres"
                       },
+                      "group": "grafana-postgresql-datasource",
+                      "kind": "DataQuery",
                       "spec": {
                         "dataset": "house_prices",
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT\n    p.lat,\n    p.lng,\n    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.price) AS median_price,\n    t.postcode\nFROM transactions t\nJOIN postcodes p ON t.postcode = p.postcode\nWHERE t.ppd_type = 'A'\n  AND t.record_status = 'A'\n  AND t.price > 0\n  AND t.county IN ($county)\n  AND t.tenure = ($tenure)\n  AND t.property_type IN ($property_type)\n  AND t.new_build = ($new_build)\n  AND t.date >= NOW() - INTERVAL '2 years'\nGROUP BY p.lat, p.lng, t.postcode\nHAVING COUNT(*) > 3;",
+                        "rawSql": "SELECT\n    p.lat,\n    p.lng,\n    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.price) AS median_price,\n    t.postcode\nFROM transactions t\nJOIN postcodes p ON t.postcode = p.postcode\nWHERE t.ppd_type = 'A'\n  AND t.record_status = 'A'\n  AND t.price > 0\n  AND t.county IN ($county)\n  AND t.tenure IN ($tenure)\n  AND t.property_type IN ($property_type)\n  AND t.new_build IN ($new_build)\n  AND t.date >= NOW() - INTERVAL '2 years'\nGROUP BY p.lat, p.lng, t.postcode\nHAVING COUNT(*) > 3;",
                         "sql": {
                           "columns": [
                             {
@@ -614,22 +610,54 @@
                           ],
                           "limit": 50
                         }
-                      }
+                      },
+                      "version": "v0"
                     },
-                    "refId": "A",
-                    "hidden": false
+                    "refId": "A"
                   }
                 }
               ],
-              "transformations": [],
-              "queryOptions": {}
+              "queryOptions": {},
+              "transformations": []
             }
           },
+          "description": "",
+          "id": 5,
+          "links": [],
+          "title": "Property Price Heatmap",
           "vizConfig": {
-            "kind": "VizConfig",
             "group": "geomap",
-            "version": "13.0.1",
+            "kind": "VizConfig",
             "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "#EAB839",
+                        "value": 250000
+                      },
+                      {
+                        "color": "semi-dark-red",
+                        "value": 350000
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
               "options": {
                 "basemap": {
                   "config": {},
@@ -716,37 +744,9 @@
                   "noRepeat": false,
                   "zoom": 15
                 }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "green"
-                      },
-                      {
-                        "value": 250000,
-                        "color": "#EAB839"
-                      },
-                      {
-                        "value": 350000,
-                        "color": "semi-dark-red"
-                      }
-                    ]
-                  },
-                  "custom": {
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    }
-                  }
-                },
-                "overrides": []
               }
-            }
+            },
+            "version": "13.0.1"
           }
         }
       }
@@ -758,66 +758,66 @@
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 0,
-              "width": 24,
-              "height": 13,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-5"
-              }
+              },
+              "height": 13,
+              "width": 24,
+              "x": 0,
+              "y": 0
             }
           },
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 13,
-              "width": 10,
-              "height": 15,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-3"
-              }
+              },
+              "height": 15,
+              "width": 10,
+              "x": 0,
+              "y": 13
             }
           },
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 10,
-              "y": 13,
-              "width": 14,
-              "height": 15,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-1"
-              }
+              },
+              "height": 15,
+              "width": 14,
+              "x": 10,
+              "y": 13
             }
           },
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 0,
-              "y": 28,
-              "width": 10,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-2"
-              }
+              },
+              "height": 8,
+              "width": 10,
+              "x": 0,
+              "y": 28
             }
           },
           {
             "kind": "GridLayoutItem",
             "spec": {
-              "x": 10,
-              "y": 28,
-              "width": 14,
-              "height": 8,
               "element": {
                 "kind": "ElementReference",
                 "name": "panel-4"
-              }
+              },
+              "height": 8,
+              "width": 14,
+              "x": 10,
+              "y": 28
             }
           }
         ]
@@ -825,12 +825,17 @@
     },
     "links": [],
     "liveNow": false,
+    "preferences": {
+      "layout": {
+        "kind": "GridLayout",
+        "spec": {
+          "items": []
+        }
+      }
+    },
     "preload": false,
     "tags": [],
     "timeSettings": {
-      "timezone": "browser",
-      "from": "1995-01-01T00:00:00.000Z",
-      "to": "2026-01-01T00:00:00.000Z",
       "autoRefresh": "",
       "autoRefreshIntervals": [
         "5s",
@@ -844,15 +849,18 @@
         "2h",
         "1d"
       ],
+      "fiscalYearStartMonth": 0,
+      "from": "1995-01-01T00:00:00.000Z",
       "hideTimepicker": false,
-      "fiscalYearStartMonth": 0
+      "timezone": "browser",
+      "to": "2026-01-01T00:00:00.000Z"
     },
     "title": "Outside M25",
     "variables": [
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "county",
+          "allowCustomValue": true,
           "current": {
             "text": [
               "KENT",
@@ -867,16 +875,18 @@
               "HERTFORDSHIRE"
             ]
           },
+          "definition": "SELECT DISTINCT county FROM transactions WHERE county != 'GREATER LONDON' AND county IS NOT NULL ORDER BY county",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "multi": true,
+          "name": "county",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "grafana-postgresql-datasource",
-            "version": "v0",
             "datasource": {
               "name": "house-prices-postgres"
             },
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
             "spec": {
               "dataset": "house_prices",
               "editorMode": "code",
@@ -902,22 +912,20 @@
                 ],
                 "limit": 50
               }
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
           "regexApplyTo": "value",
-          "sort": "disabled",
-          "definition": "SELECT DISTINCT county FROM transactions WHERE county != 'GREATER LONDON' AND county IS NOT NULL ORDER BY county",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "disabled"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "district",
+          "allowCustomValue": true,
           "current": {
             "text": [
               "All"
@@ -926,16 +934,18 @@
               "$__all"
             ]
           },
+          "definition": "SELECT DISTINCT district FROM transactions WHERE county != 'GREATER LONDON' AND district IS NOT NULL ORDER BY district",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "multi": true,
+          "name": "district",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "grafana-postgresql-datasource",
-            "version": "v0",
             "datasource": {
               "name": "house-prices-postgres"
             },
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
             "spec": {
               "dataset": "house_prices",
               "editorMode": "code",
@@ -961,22 +971,20 @@
                 ],
                 "limit": 50
               }
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
           "regexApplyTo": "value",
-          "sort": "disabled",
-          "definition": "SELECT DISTINCT district FROM transactions WHERE county != 'GREATER LONDON' AND district IS NOT NULL ORDER BY district",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "disabled"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "tenure",
+          "allowCustomValue": true,
           "current": {
             "text": [
               "F"
@@ -985,16 +993,18 @@
               "F"
             ]
           },
+          "definition": "SELECT DISTINCT tenure FROM transactions WHERE tenure IS NOT NULL ORDER BY tenure",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "multi": true,
+          "name": "tenure",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "grafana-postgresql-datasource",
-            "version": "v0",
             "datasource": {
               "name": "house-prices-postgres"
             },
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
             "spec": {
               "dataset": "house_prices",
               "editorMode": "code",
@@ -1020,22 +1030,20 @@
                 ],
                 "limit": 50
               }
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
           "regexApplyTo": "value",
-          "sort": "disabled",
-          "definition": "SELECT DISTINCT tenure FROM transactions WHERE tenure IS NOT NULL ORDER BY tenure",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "disabled"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "property_type",
+          "allowCustomValue": true,
           "current": {
             "text": [
               "All"
@@ -1044,16 +1052,18 @@
               "$__all"
             ]
           },
+          "definition": "SELECT DISTINCT property_type FROM transactions WHERE property_type IS NOT NULL ORDER BY property_type",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "multi": true,
+          "name": "property_type",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "grafana-postgresql-datasource",
-            "version": "v0",
             "datasource": {
               "name": "house-prices-postgres"
             },
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
             "spec": {
               "dataset": "house_prices",
               "editorMode": "code",
@@ -1079,22 +1089,20 @@
                 ],
                 "limit": 50
               }
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
           "regexApplyTo": "value",
-          "sort": "disabled",
-          "definition": "SELECT DISTINCT property_type FROM transactions WHERE property_type IS NOT NULL ORDER BY property_type",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "disabled"
         }
       },
       {
         "kind": "QueryVariable",
         "spec": {
-          "name": "new_build",
+          "allowCustomValue": true,
           "current": {
             "text": [
               "N"
@@ -1103,16 +1111,18 @@
               "N"
             ]
           },
+          "definition": "SELECT DISTINCT new_build FROM transactions WHERE new_build IS NOT NULL ORDER BY new_build",
           "hide": "dontHide",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": false,
+          "includeAll": true,
+          "multi": true,
+          "name": "new_build",
+          "options": [],
           "query": {
-            "kind": "DataQuery",
-            "group": "grafana-postgresql-datasource",
-            "version": "v0",
             "datasource": {
               "name": "house-prices-postgres"
             },
+            "group": "grafana-postgresql-datasource",
+            "kind": "DataQuery",
             "spec": {
               "dataset": "house_prices",
               "editorMode": "code",
@@ -1138,26 +1148,16 @@
                 ],
                 "limit": 50
               }
-            }
+            },
+            "version": "v0"
           },
+          "refresh": "onDashboardLoad",
           "regex": "",
           "regexApplyTo": "value",
-          "sort": "disabled",
-          "definition": "SELECT DISTINCT new_build FROM transactions WHERE new_build IS NOT NULL ORDER BY new_build",
-          "options": [],
-          "multi": true,
-          "includeAll": true,
-          "allowCustomValue": true
+          "skipUrlSync": false,
+          "sort": "disabled"
         }
       }
-    ],
-    "preferences": {
-      "layout": {
-        "kind": "GridLayout",
-        "spec": {
-          "items": []
-        }
-      }
-    }
+    ]
   }
 }
